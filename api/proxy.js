@@ -38,7 +38,7 @@ export default async function handler(req) {
 
     const contentType = response.headers.get('content-type') || '';
 
-    // 3. HTML Interception & Fixed Close-Event Popup
+    // 3. HTML Interception & Scroll Fix Injection
     if (contentType.includes('text/html')) {
       let html = await response.text();
 
@@ -136,23 +136,28 @@ export default async function handler(req) {
         }
       </style>
       <script>
-        // Guaranteed Instant Close Function
+        // Instant Close & Unfreeze Scrolling Function
         function closeSrModal() {
           var el = document.getElementById('srOverlay');
           if (el) {
             el.style.setProperty('display', 'none', 'important');
             el.remove();
           }
+
+          // Force enable scrolling on body and html elements
+          document.body.style.setProperty('overflow', 'auto', 'important');
+          document.body.style.setProperty('position', 'static', 'important');
+          document.documentElement.style.setProperty('overflow', 'auto', 'important');
         }
 
         document.addEventListener('DOMContentLoaded', function() {
-          // Cleanup old popups
+          // Cleanup old popups continuously
           setInterval(function() {
             var oldPopups = document.querySelectorAll('#join-tg-popup-container');
             oldPopups.forEach(function(item) { item.remove(); });
           }, 400);
 
-          // Direct Close Event Binding
+          // Direct Event Binding
           var closeBtn = document.getElementById('srClose');
           var overlay = document.getElementById('srOverlay');
 
