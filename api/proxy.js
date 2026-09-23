@@ -38,13 +38,13 @@ export default async function handler(req) {
 
     const contentType = response.headers.get('content-type') || '';
 
-    // 3. HTML Interception & Clean Popup Injection
+    // 3. HTML Interception & Fixed Close-Event Popup
     if (contentType.includes('text/html')) {
       let html = await response.text();
 
       const injectedAssets = `
       <style>
-        /* Forcefully Hide Original Telegram Popup */
+        /* Hide Original Telegram Popup Completely */
         #join-tg-popup-container, 
         [id*="join-tg-popup"] {
           display: none !important;
@@ -53,7 +53,7 @@ export default async function handler(req) {
           pointer-events: none !important;
         }
 
-        /* New Clean SR Popup Styling */
+        /* SR Popup Styles */
         .sr-overlay {
           position: fixed;
           top: 0;
@@ -83,12 +83,12 @@ export default async function handler(req) {
           position: absolute;
           top: 16px;
           right: 16px;
-          width: 32px;
-          height: 32px;
+          width: 36px;
+          height: 36px;
           background: #f2f2f4;
           border: none;
           border-radius: 50%;
-          font-size: 14px;
+          font-size: 16px;
           color: #333333;
           cursor: pointer;
           display: flex;
@@ -97,6 +97,7 @@ export default async function handler(req) {
           outline: none;
           user-select: none;
           -webkit-tap-highlight-color: transparent;
+          z-index: 10;
         }
         #srIcon {
           width: 70px;
@@ -135,27 +136,35 @@ export default async function handler(req) {
         }
       </style>
       <script>
-        // Global Close Function
-        window.closeTelegramPopup = function() {
-          const overlay = document.getElementById('srOverlay');
-          if (overlay) {
-            overlay.style.display = 'none';
+        // Guaranteed Instant Close Function
+        function closeSrModal() {
+          var el = document.getElementById('srOverlay');
+          if (el) {
+            el.style.setProperty('display', 'none', 'important');
+            el.remove();
           }
-        };
+        }
 
         document.addEventListener('DOMContentLoaded', function() {
-          // Continuous cleanup for any leftover original popups
+          // Cleanup old popups
           setInterval(function() {
-            const oldPopups = document.querySelectorAll('#join-tg-popup-container');
-            oldPopups.forEach(el => el.remove());
-          }, 500);
+            var oldPopups = document.querySelectorAll('#join-tg-popup-container');
+            oldPopups.forEach(function(item) { item.remove(); });
+          }, 400);
 
-          // Close listener on overlay click
-          const overlay = document.getElementById('srOverlay');
+          // Direct Close Event Binding
+          var closeBtn = document.getElementById('srClose');
+          var overlay = document.getElementById('srOverlay');
+
+          if (closeBtn) {
+            closeBtn.addEventListener('click', closeSrModal);
+            closeBtn.addEventListener('touchstart', closeSrModal);
+          }
+
           if (overlay) {
             overlay.addEventListener('click', function(e) {
               if (e.target === overlay) {
-                window.closeTelegramPopup();
+                closeSrModal();
               }
             });
           }
@@ -164,7 +173,7 @@ export default async function handler(req) {
         (function() {
           const myDomain = '${currentDomain}';
           
-          // Fetch API Interceptor
+          // Fetch Interceptor
           const originalFetch = window.fetch;
           window.fetch = function(...args) {
             if (typeof args[0] === 'string' && args[0].includes('vidcloud.eu.org')) {
@@ -188,13 +197,13 @@ export default async function handler(req) {
       const newPopupHTML = `
       <div id="srOverlay" class="sr-overlay">
         <div id="srPopup">
-          <button id="srClose" onclick="window.closeTelegramPopup()">✕</button>
+          <div id="srClose" onclick="closeSrModal()" ontouchstart="closeSrModal()">✕</div>
           <div id="srIcon">📢</div>
           <div id="srTitle">Join Our Community</div>
           <div id="srSub">
             Stay updated with latest material<br>and notifications
           </div>
-          <a href="https://t.me/studystark" target="_blank" id="srBtn" onclick="window.closeTelegramPopup()">
+          <a href="https://t.me/studystark" target="_blank" id="srBtn" onclick="closeSrModal()">
             Join Now
           </a>
         </div>
