@@ -7,7 +7,7 @@ export default async function handler(req) {
   const currentDomain = url.origin; 
   const targetDomain = 'https://vidcloud.eu.org';
 
-  // 1. Preflight CORS Requests Handle Karein
+  // 1. Preflight CORS Requests
   if (req.method === 'OPTIONS') {
     return new Response(null, {
       status: 200,
@@ -20,7 +20,7 @@ export default async function handler(req) {
     });
   }
 
-  // 2. Exact Query Parameters Target Domain Par Forward Karein
+  // 2. Target Forwarding
   const targetUrl = targetDomain + url.pathname + url.search;
 
   const forwardHeaders = new Headers(req.headers);
@@ -38,13 +38,22 @@ export default async function handler(req) {
 
     const contentType = response.headers.get('content-type') || '';
 
-    // 3. Player Page HTML Interception & New Popup Injection
+    // 3. HTML Interception & Clean Popup Injection
     if (contentType.includes('text/html')) {
       let html = await response.text();
 
-      // Naya Popup CSS, Close JS aur Interceptors
-      const newPopupStylesAndScripts = `
+      const injectedAssets = `
       <style>
+        /* Forcefully Hide Original Telegram Popup */
+        #join-tg-popup-container, 
+        [id*="join-tg-popup"] {
+          display: none !important;
+          visibility: hidden !important;
+          opacity: 0 !important;
+          pointer-events: none !important;
+        }
+
+        /* New Clean SR Popup Styling */
         .sr-overlay {
           position: fixed;
           top: 0;
@@ -55,7 +64,7 @@ export default async function handler(req) {
           display: flex;
           align-items: center;
           justify-content: center;
-          z-index: 99999;
+          z-index: 9999999 !important;
           backdrop-filter: blur(2px);
         }
         #srPopup {
@@ -86,6 +95,8 @@ export default async function handler(req) {
           align-items: center;
           justify-content: center;
           outline: none;
+          user-select: none;
+          -webkit-tap-highlight-color: transparent;
         }
         #srIcon {
           width: 70px;
@@ -124,10 +135,31 @@ export default async function handler(req) {
         }
       </style>
       <script>
-        function closeTelegramPopup() {
+        // Global Close Function
+        window.closeTelegramPopup = function() {
           const overlay = document.getElementById('srOverlay');
-          if (overlay) overlay.style.display = 'none';
-        }
+          if (overlay) {
+            overlay.style.display = 'none';
+          }
+        };
+
+        document.addEventListener('DOMContentLoaded', function() {
+          // Continuous cleanup for any leftover original popups
+          setInterval(function() {
+            const oldPopups = document.querySelectorAll('#join-tg-popup-container');
+            oldPopups.forEach(el => el.remove());
+          }, 500);
+
+          // Close listener on overlay click
+          const overlay = document.getElementById('srOverlay');
+          if (overlay) {
+            overlay.addEventListener('click', function(e) {
+              if (e.target === overlay) {
+                window.closeTelegramPopup();
+              }
+            });
+          }
+        });
 
         (function() {
           const myDomain = '${currentDomain}';
@@ -153,33 +185,26 @@ export default async function handler(req) {
       </script>
       </head>`;
 
-      // Naya Clean Popup HTML Structure
       const newPopupHTML = `
       <div id="srOverlay" class="sr-overlay">
         <div id="srPopup">
-          <button id="srClose" onclick="closeTelegramPopup()">✕</button>
+          <button id="srClose" onclick="window.closeTelegramPopup()">✕</button>
           <div id="srIcon">📣</div>
           <div id="srTitle">Join Our Community</div>
           <div id="srSub">
             Stay updated with latest material<br>and notifications
           </div>
-          <a href="https://t.me/studystark" target="_blank" id="srBtn" onclick="closeTelegramPopup()">
+          <a href="https://t.me/studystark" target="_blank" id="srBtn" onclick="window.closeTelegramPopup()">
             Join Now
           </a>
         </div>
       </div>
       </body>`;
 
-      // Head Tag Modification
-      html = html.replace('</head>', newPopupStylesAndScripts);
-
-      // Purana Popup Remove Karein (Agar HTML me exist karta hai)
-      html = html.replace(/<div id="join-tg-popup-container">[\s\S]*?<\/div>/gi, '');
-      
-      // Naya Popup Attach Karein Body ke End me
+      html = html.replace('</head>', injectedAssets);
       html = html.replace('</body>', newPopupHTML);
 
-      // Domain aur Branding Replacement
+      // Rebranding
       html = html.replaceAll('https://vidcloud.eu.org', currentDomain);
       html = html.replaceAll('vidcloud.eu.org', url.host);
       html = html.replaceAll('Study Stark', 'AURA MAX');
@@ -194,7 +219,7 @@ export default async function handler(req) {
       });
     }
 
-    // 4. JS & JSON Rewriting (Play.php player scripts)
+    // 4. JS & JSON Handlers
     if (contentType.includes('javascript') || contentType.includes('json')) {
       let text = await response.text();
       text = text.replaceAll('https://vidcloud.eu.org', currentDomain);
@@ -209,7 +234,7 @@ export default async function handler(req) {
       });
     }
 
-    // 5. Media & Stream Data Direct Serving with CORS
+    // 5. Media & Streams
     const modifiedHeaders = new Headers(response.headers);
     modifiedHeaders.set('access-control-allow-origin', '*');
     modifiedHeaders.set('access-control-allow-methods', 'GET, POST, PUT, DELETE, OPTIONS');
