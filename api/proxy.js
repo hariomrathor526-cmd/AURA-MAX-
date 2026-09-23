@@ -6,49 +6,90 @@ export default async function handler(req) {
   const url = new URL(req.url);
   const targetUrl = 'https://vidcloud.eu.org' + url.pathname + url.search;
 
+  // Uncompressed plain text response fetch karne ke liye headers:
+  const forwardHeaders = new Headers(req.headers);
+  forwardHeaders.set('host', 'vidcloud.eu.org');
+  forwardHeaders.set('referer', 'https://vidcloud.eu.org/');
+  forwardHeaders.delete('accept-encoding');
+
   try {
     const response = await fetch(targetUrl, {
       method: req.method,
-      headers: {
-        'host': 'vidcloud.eu.org',
-        'referer': 'https://vidcloud.eu.org/',
-        'user-agent': req.headers.get('user-agent') || '',
-      },
+      headers: forwardHeaders,
+      body: req.method !== 'GET' && req.method !== 'HEAD' ? req.body : null,
     });
 
     const contentType = response.headers.get('content-type') || '';
 
-    // 1. Agar HTML / JS response hai toh Domain aur URLs replace karein
-    if (contentType.includes('text/html') || contentType.includes('application/javascript')) {
-      let content = await response.text();
+    // 1. HTML me Script Injection (Jo runtime par har API URL ko replace karega)
+    if (contentType.includes('text/html')) {
+      let html = await response.text();
 
-      // Sabhi Hardcoded API Calls ko Aapke Vercel Domain Par Redirect Karein
-      content = content.replace(/https:\/\/vidcloud\.eu\.org/g, 'https://apnaweb-eta.vercel.app');
+      const scriptInjector = `
+      <script>
+        (function() {
+          const targetDomain = 'https://apnaweb-eta.vercel.app';
+          
+          // Fetch API Interceptor
+          const originalFetch = window.fetch;
+          window.fetch = function(...args) {
+            if (typeof args[0] === 'string' && args[0].includes('vidcloud.eu.org')) {
+              args[0] = args[0].replace('https://vidcloud.eu.org', targetDomain);
+            }
+            return originalFetch.apply(this, args);
+          };
 
-      // Branding & Name Replacement
-      content = content.replace(/Study Stark/gi, 'AURA MAX');
-      content = content.replace(/VidCloud/gi, 'AURA MAX');
+          // XHR Interceptor
+          const originalXHR = window.XMLHttpRequest.prototype.open;
+          window.XMLHttpRequest.prototype.open = function(method, url, ...rest) {
+            if (typeof url === 'string' && url.includes('vidcloud.eu.org')) {
+              url = url.replace('https://vidcloud.eu.org', targetDomain);
+            }
+            return originalXHR.call(this, method, url, ...rest);
+          };
+        })();
+      </script>
+      </head>`;
 
-      return new Response(content, {
+      html = html.replace('</head>', scriptInjector);
+      html = html.replaceAll('https://vidcloud.eu.org', 'https://apnaweb-eta.vercel.app');
+      html = html.replaceAll('vidcloud.eu.org', 'apnaweb-eta.vercel.app');
+      html = html.replaceAll('Study Stark', 'AURA MAX');
+      html = html.replaceAll('VidCloud', 'AURA MAX');
+
+      return new Response(html, {
         status: response.status,
         headers: {
-          'content-type': contentType,
+          'content-type': 'text/html; charset=utf-8',
           'access-control-allow-origin': '*',
-          'access-control-allow-methods': 'GET, POST, PUT, DELETE, OPTIONS',
-          'access-control-allow-headers': '*',
         },
       });
     }
 
-    // 2. CORS Handling for API Requests (Jab options ya JSON fetch hoga)
-    const newHeaders = new Headers(response.headers);
-    newHeaders.set('access-control-allow-origin', '*');
-    newHeaders.set('access-control-allow-methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    newHeaders.set('access-control-allow-headers', '*');
+    // 2. JavaScript files me URL replacement
+    if (contentType.includes('javascript') || contentType.includes('json')) {
+      let text = await response.text();
+      text = text.replaceAll('https://vidcloud.eu.org', 'https://apnaweb-eta.vercel.app');
+      text = text.replaceAll('vidcloud.eu.org', 'apnaweb-eta.vercel.app');
+
+      return new Response(text, {
+        status: response.status,
+        headers: {
+          'content-type': contentType,
+          'access-control-allow-origin': '*',
+        },
+      });
+    }
+
+    // 3. Normal Requests & CORS Handling
+    const modifiedHeaders = new Headers(response.headers);
+    modifiedHeaders.set('access-control-allow-origin', '*');
+    modifiedHeaders.set('access-control-allow-methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    modifiedHeaders.set('access-control-allow-headers', '*');
 
     return new Response(response.body, {
       status: response.status,
-      headers: newHeaders,
+      headers: modifiedHeaders,
     });
 
   } catch (error) {
