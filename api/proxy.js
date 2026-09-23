@@ -189,7 +189,7 @@ export default async function handler(req) {
       <div id="srOverlay" class="sr-overlay">
         <div id="srPopup">
           <button id="srClose" onclick="window.closeTelegramPopup()">✕</button>
-          <div id="srIcon">📣</div>
+          <div id="srIcon">📢</div>
           <div id="srTitle">Join Our Community</div>
           <div id="srSub">
             Stay updated with latest material<br>and notifications
