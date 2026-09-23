@@ -3,10 +3,22 @@ export const config = {
 };
 
 export default async function handler(req) {
+  // 1. CORS Preflight (OPTIONS) Requests ko turant Allow karein
+  if (req.method === 'OPTIONS') {
+    return new Response(null, {
+      status: 200,
+      headers: {
+        'access-control-allow-origin': '*',
+        'access-control-allow-methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'access-control-allow-headers': '*',
+        'access-control-max-age': '86400',
+      },
+    });
+  }
+
   const url = new URL(req.url);
   const targetUrl = 'https://vidcloud.eu.org' + url.pathname + url.search;
 
-  // Uncompressed plain text response fetch karne ke liye headers:
   const forwardHeaders = new Headers(req.headers);
   forwardHeaders.set('host', 'vidcloud.eu.org');
   forwardHeaders.set('referer', 'https://vidcloud.eu.org/');
@@ -21,7 +33,7 @@ export default async function handler(req) {
 
     const contentType = response.headers.get('content-type') || '';
 
-    // 1. HTML me Script Injection (Jo runtime par har API URL ko replace karega)
+    // 2. HTML Text Replacements
     if (contentType.includes('text/html')) {
       let html = await response.text();
 
@@ -29,8 +41,6 @@ export default async function handler(req) {
       <script>
         (function() {
           const targetDomain = 'https://apnaweb-eta.vercel.app';
-          
-          // Fetch API Interceptor
           const originalFetch = window.fetch;
           window.fetch = function(...args) {
             if (typeof args[0] === 'string' && args[0].includes('vidcloud.eu.org')) {
@@ -39,7 +49,6 @@ export default async function handler(req) {
             return originalFetch.apply(this, args);
           };
 
-          // XHR Interceptor
           const originalXHR = window.XMLHttpRequest.prototype.open;
           window.XMLHttpRequest.prototype.open = function(method, url, ...rest) {
             if (typeof url === 'string' && url.includes('vidcloud.eu.org')) {
@@ -66,7 +75,7 @@ export default async function handler(req) {
       });
     }
 
-    // 2. JavaScript files me URL replacement
+    // 3. JavaScript Files Rewrite
     if (contentType.includes('javascript') || contentType.includes('json')) {
       let text = await response.text();
       text = text.replaceAll('https://vidcloud.eu.org', 'https://apnaweb-eta.vercel.app');
@@ -81,7 +90,7 @@ export default async function handler(req) {
       });
     }
 
-    // 3. Normal Requests & CORS Handling
+    // 4. Sabhi Responses ke saath mandatory CORS Headers bhejein
     const modifiedHeaders = new Headers(response.headers);
     modifiedHeaders.set('access-control-allow-origin', '*');
     modifiedHeaders.set('access-control-allow-methods', 'GET, POST, PUT, DELETE, OPTIONS');
