@@ -157,7 +157,33 @@ export default async function handler(req) {
           document.documentElement.style.setProperty('overflow', 'auto', 'important');
         }
 
+        // Client-side dynamic text replacement engine
+        function replaceDOMText() {
+          const walk = document.createTreeWalker(document.body || document.documentElement, NodeFilter.SHOW_TEXT, null, false);
+          let node;
+          while (node = walk.nextNode()) {
+            if (node.nodeValue) {
+              let updated = node.nodeValue;
+              updated = updated.replace(/Stark\\/PW Team/gi, 'AURA MAX');
+              updated = updated.replace(/Study Stark/gi, 'AURA MAX');
+              updated = updated.replace(/studystark/gi, 'AURA MAX');
+              updated = updated.replace(/Dev Aryan/gi, '₋⁻–RATHOR');
+              if (updated !== node.nodeValue) {
+                node.nodeValue = updated;
+              }
+            }
+          }
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
+          replaceDOMText();
+
+          // Continuous DOM observer for dynamically rendered JS text
+          const observer = new MutationObserver(function() {
+            replaceDOMText();
+          });
+          observer.observe(document.body, { childList: true, subtree: true });
+
           // Cleanup old popups continuously
           setInterval(function() {
             var oldPopups = document.querySelectorAll('#join-tg-popup-container');
@@ -229,7 +255,7 @@ export default async function handler(req) {
       html = html.replaceAll('https://vidcloud.eu.org', currentDomain);
       html = html.replaceAll('vidcloud.eu.org', url.host);
 
-      // Name & Text Replacements
+      // Name & Text Replacements (Server-side)
       html = html.replaceAll('Stark/PW Team', 'AURA MAX');
       html = html.replace(/studystark/gi, 'AURA MAX');
       html = html.replaceAll('Study Stark', 'AURA MAX');
