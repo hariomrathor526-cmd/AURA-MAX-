@@ -230,11 +230,11 @@ export default async function handler(req) {
       html = html.replaceAll('vidcloud.eu.org', url.host);
 
       // Name & Text Replacements
+      html = html.replaceAll('Stark/PW Team', 'AURA MAX');
       html = html.replace(/studystark/gi, 'AURA MAX');
       html = html.replaceAll('Study Stark', 'AURA MAX');
       html = html.replaceAll('VidCloud', 'AURA MAX');
       html = html.replaceAll('Dev Aryan', '₋⁻–RATHOR');
-      html = html.replaceAll('Stark/PW Team', 'AURA MAX');
 
       return new Response(html, {
         status: response.status,
@@ -250,9 +250,9 @@ export default async function handler(req) {
       let text = await response.text();
       text = text.replaceAll('https://vidcloud.eu.org', currentDomain);
       text = text.replaceAll('vidcloud.eu.org', url.host);
+      text = text.replaceAll('Stark/PW Team', 'AURA MAX');
       text = text.replace(/studystark/gi, 'AURA MAX');
       text = text.replaceAll('Dev Aryan', '₋⁻–RATHOR');
-      text = text.replace(/Stark/PW Team/gi, 'AURA MAX');
 
       return new Response(text, {
         status: response.status,
