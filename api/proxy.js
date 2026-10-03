@@ -7,6 +7,9 @@ export default async function handler(req) {
   const currentDomain = url.origin; 
   const targetDomain = 'https://vidcloud.eu.org';
 
+  const oldLogo = 'https://vidcloud.eu.org/images/logo.png';
+  const newLogo = 'https://cdn.phototourl.com/member/2026-10-02-62a99f01-301c-41f1-9584-0fd12ae4b326.jpg';
+
   // 1. Preflight CORS Requests
   if (req.method === 'OPTIONS') {
     return new Response(null, {
@@ -175,12 +178,26 @@ export default async function handler(req) {
           }
         }
 
+        // Client-side logo image replacement engine
+        function replaceImages() {
+          const oldUrl = "${oldLogo}";
+          const newUrl = "${newLogo}";
+
+          document.querySelectorAll('img').forEach(function(img) {
+            if (img.src && img.src.includes('images/logo.png')) {
+              img.src = newUrl;
+            }
+          });
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
           replaceDOMText();
+          replaceImages();
 
-          // Continuous DOM observer for dynamically rendered JS text
+          // Continuous DOM observer for dynamically rendered elements
           const observer = new MutationObserver(function() {
             replaceDOMText();
+            replaceImages();
           });
           observer.observe(document.body, { childList: true, subtree: true });
 
@@ -251,6 +268,10 @@ export default async function handler(req) {
       html = html.replace('</head>', injectedAssets);
       html = html.replace('</body>', newPopupHTML);
 
+      // Logo Image Replacements (Server-side)
+      html = html.replaceAll(oldLogo, newLogo);
+      html = html.replaceAll('/images/logo.png', newLogo);
+
       // Rebranding
       html = html.replaceAll('https://vidcloud.eu.org', currentDomain);
       html = html.replaceAll('vidcloud.eu.org', url.host);
@@ -274,6 +295,11 @@ export default async function handler(req) {
     // 4. JS & JSON Handlers
     if (contentType.includes('javascript') || contentType.includes('json')) {
       let text = await response.text();
+      
+      // Logo Image Replacement in JS/JSON
+      text = text.replaceAll(oldLogo, newLogo);
+      text = text.replaceAll('/images/logo.png', newLogo);
+
       text = text.replaceAll('https://vidcloud.eu.org', currentDomain);
       text = text.replaceAll('vidcloud.eu.org', url.host);
       text = text.replaceAll('Stark/PW Team', 'AURA MAX');
