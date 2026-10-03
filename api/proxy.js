@@ -39,7 +39,7 @@ export default async function handler(req) {
 
     const contentType = response.headers.get('content-type') || '';
 
-    // 3. HTML Interception & Scroll Fix Injection
+    // 3. HTML Interception & Replacement
     if (contentType.includes('text/html')) {
       let html = await response.text();
 
@@ -54,11 +54,17 @@ export default async function handler(req) {
           pointer-events: none !important;
         }
 
-        /* Hide ONLY Top Action Telegram and WhatsApp Buttons (Keep Popup Intact) */
+        /* Hide ONLY Top Action Telegram and WhatsApp Buttons */
         .btn-top-action[href*="telegram.me"],
         .btn-top-action[href*="t.me"],
         .btn-top-action[href*="whatsapp.com"] {
           display: none !important;
+        }
+
+        /* Force Override CSS Background Logos if any */
+        [style*="logo.png"],
+        .logo-bg {
+          background-image: url('${newLogoUrl}') !important;
         }
 
         /* SR Popup Styles */
@@ -144,64 +150,74 @@ export default async function handler(req) {
         }
       </style>
       <script>
-        // Instant Close & Unfreeze Scrolling Function
         function closeSrModal() {
           var el = document.getElementById('srOverlay');
           if (el) {
             el.style.setProperty('display', 'none', 'important');
             el.remove();
           }
-
-          // Force enable scrolling on body and html elements
           document.body.style.setProperty('overflow', 'auto', 'important');
           document.body.style.setProperty('position', 'static', 'important');
           document.documentElement.style.setProperty('overflow', 'auto', 'important');
         }
 
-        // Client-side dynamic text & image replacement engine
-        function replaceDOMContent() {
-          const newLogo = "${newLogoUrl}";
-          
-          // Image Src Replacements
-          document.querySelectorAll('img').forEach(function(img) {
-            if (img.src && (img.src.includes('/images/logo.png') || img.src.includes('vidcloud.eu.org/images/logo.png'))) {
-              img.src = newLogo;
-            }
-          });
+        // Deep DOM Replacer Engine
+        function forceDOMReplacement() {
+          const targetLogo = "${newLogoUrl}";
 
-          // Text Replacements
-          const walk = document.createTreeWalker(document.body || document.documentElement, NodeFilter.SHOW_TEXT, null, false);
+          // 1. Force Image replacements
+          const images = document.getElementsByTagName('img');
+          for (let i = 0; i < images.length; i++) {
+            let img = images[i];
+            if (img.src && (img.src.includes('logo') || img.src.includes('vidcloud.eu.org/images/'))) {
+              if (img.src !== targetLogo) {
+                img.src = targetLogo;
+              }
+            }
+          }
+
+          // 2. Direct Text replacements using TreeWalker
+          const walker = document.createTreeWalker(
+            document.body || document.documentElement,
+            NodeFilter.SHOW_TEXT,
+            null,
+            false
+          );
+
           let node;
-          while (node = walk.nextNode()) {
-            if (node.nodeValue) {
-              let updated = node.nodeValue;
-              updated = updated.replace(/Stark\\/PW Team/gi, 'AURA MAX');
-              updated = updated.replace(/Study Stark/gi, 'AURA MAX');
-              updated = updated.replace(/studystark/gi, 'AURA MAX');
-              updated = updated.replace(/Dev Aryan/gi, '₋⁻–RATHOR');
-              if (updated !== node.nodeValue) {
-                node.nodeValue = updated;
+          while (node = walker.nextNode()) {
+            if (node.nodeValue && node.parentNode.id !== 'srPopup') {
+              let val = node.nodeValue;
+              if (/Stark\/PW Team|Study Stark|studystark|StudyStark/i.test(val)) {
+                node.nodeValue = val.replace(/Stark\/PW Team|Study Stark|studystark|StudyStark/gi, 'AURA MAX');
+              }
+              if (/Dev Aryan/i.test(node.nodeValue)) {
+                node.nodeValue = node.nodeValue.replace(/Dev Aryan/gi, '₋⁻–RATHOR');
               }
             }
           }
         }
 
         document.addEventListener('DOMContentLoaded', function() {
-          replaceDOMContent();
+          forceDOMReplacement();
 
-          // Continuous DOM observer for dynamically rendered JS elements
+          // Mutation Observer to continuous catch React rendering changes
           const observer = new MutationObserver(function() {
-            replaceDOMContent();
+            forceDOMReplacement();
           });
-          observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['src'] });
 
-          // Cleanup old popups continuously
+          observer.observe(document.body || document.documentElement, {
+            childList: true,
+            subtree: true,
+            characterData: true
+          });
+
+          // Cleanup old popups
           setInterval(function() {
             var oldPopups = document.querySelectorAll('#join-tg-popup-container');
             oldPopups.forEach(function(item) { item.remove(); });
           }, 400);
 
-          // Direct Event Binding
           var closeBtn = document.getElementById('srClose');
           var overlay = document.getElementById('srOverlay');
 
@@ -212,17 +228,13 @@ export default async function handler(req) {
 
           if (overlay) {
             overlay.addEventListener('click', function(e) {
-              if (e.target === overlay) {
-                closeSrModal();
-              }
+              if (e.target === overlay) closeSrModal();
             });
           }
         });
 
         (function() {
           const myDomain = '${currentDomain}';
-          
-          // Fetch Interceptor
           const originalFetch = window.fetch;
           window.fetch = function(...args) {
             if (typeof args[0] === 'string' && args[0].includes('vidcloud.eu.org')) {
@@ -231,7 +243,6 @@ export default async function handler(req) {
             return originalFetch.apply(this, args);
           };
 
-          // XHR Interceptor
           const originalXHR = window.XMLHttpRequest.prototype.open;
           window.XMLHttpRequest.prototype.open = function(method, url, ...rest) {
             if (typeof url === 'string' && url.includes('vidcloud.eu.org')) {
@@ -262,19 +273,16 @@ export default async function handler(req) {
       html = html.replace('</head>', injectedAssets);
       html = html.replace('</body>', newPopupHTML);
 
-      // Rebranding
+      // Server-side Bulk String Replacement
+      html = html.replaceAll('https://vidcloud.eu.org/images/logo.png', newLogoUrl);
+      html = html.replaceAll('/images/logo.png', newLogoUrl);
       html = html.replaceAll('https://vidcloud.eu.org', currentDomain);
       html = html.replaceAll('vidcloud.eu.org', url.host);
 
-      // Logo Image Replacements (Server-side)
-      html = html.replaceAll(`${currentDomain}/images/logo.png`, newLogoUrl);
-      html = html.replaceAll('https://vidcloud.eu.org/images/logo.png', newLogoUrl);
-      html = html.replaceAll('/images/logo.png', newLogoUrl);
-
-      // Name & Text Replacements (Server-side)
       html = html.replaceAll('Stark/PW Team', 'AURA MAX');
       html = html.replace(/studystark/gi, 'AURA MAX');
       html = html.replaceAll('Study Stark', 'AURA MAX');
+      html = html.replaceAll('StudyStark', 'AURA MAX');
       html = html.replaceAll('VidCloud', 'AURA MAX');
       html = html.replaceAll('Dev Aryan', '₋⁻–RATHOR');
 
@@ -290,11 +298,14 @@ export default async function handler(req) {
     // 4. JS & JSON Handlers
     if (contentType.includes('javascript') || contentType.includes('json')) {
       let text = await response.text();
+      text = text.replaceAll('https://vidcloud.eu.org/images/logo.png', newLogoUrl);
+      text = text.replaceAll('/images/logo.png', newLogoUrl);
       text = text.replaceAll('https://vidcloud.eu.org', currentDomain);
       text = text.replaceAll('vidcloud.eu.org', url.host);
-      text = text.replaceAll('/images/logo.png', newLogoUrl);
       text = text.replaceAll('Stark/PW Team', 'AURA MAX');
       text = text.replace(/studystark/gi, 'AURA MAX');
+      text = text.replaceAll('Study Stark', 'AURA MAX');
+      text = text.replaceAll('StudyStark', 'AURA MAX');
       text = text.replaceAll('Dev Aryan', '₋⁻–RATHOR');
 
       return new Response(text, {
