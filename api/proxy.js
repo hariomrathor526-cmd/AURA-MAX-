@@ -252,6 +252,7 @@ export default async function handler(req) {
       text = text.replaceAll('vidcloud.eu.org', url.host);
       text = text.replace(/studystark/gi, 'AURA MAX');
       text = text.replaceAll('Dev Aryan', '₋⁻–RATHOR');
+      text = text.replace(/Stark/PW Team/gi, 'AURA MAX');
 
       return new Response(text, {
         status: response.status,
