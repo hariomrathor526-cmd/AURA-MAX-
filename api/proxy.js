@@ -63,6 +63,69 @@ export default async function handler(req) {
           display: none !important;
         }
 
+        /* Custom Header Dropdown Menu Styles */
+        .custom-menu-wrapper {
+          position: relative;
+          display: inline-block;
+        }
+        .custom-menu-trigger {
+          background: #1e1e2d;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          color: #ffffff;
+          padding: 8px 12px;
+          border-radius: 12px;
+          cursor: pointer;
+          font-size: 20px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          outline: none;
+        }
+        .custom-dropdown-content {
+          display: none;
+          position: absolute;
+          right: 0;
+          top: 110%;
+          background: #181824;
+          border: 1px solid rgba(255, 255, 255, 0.15);
+          min-width: 190px;
+          box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+          border-radius: 16px;
+          z-index: 999999;
+          padding: 8px;
+          flex-direction: column;
+          gap: 6px;
+        }
+        .custom-dropdown-content.show {
+          display: flex !important;
+        }
+        .custom-dropdown-content .header-btn {
+          width: 100% !important;
+          justify-content: flex-start !important;
+          padding: 10px 14px !important;
+          border-radius: 10px !important;
+          background: rgba(255, 255, 255, 0.05) !important;
+          border: none !important;
+          color: #fff !important;
+          font-size: 14px !important;
+          gap: 10px !important;
+        }
+        .custom-dropdown-content .header-btn:hover {
+          background: rgba(255, 255, 255, 0.12) !important;
+        }
+        .custom-menu-tg-btn {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          background: #0088cc;
+          color: #ffffff;
+          text-decoration: none;
+          padding: 10px 14px;
+          border-radius: 10px;
+          font-size: 14px;
+          font-weight: 600;
+        }
+
         /* SR Popup Styles */
         .sr-overlay {
           position: fixed;
@@ -154,7 +217,6 @@ export default async function handler(req) {
             el.remove();
           }
 
-          // Force enable scrolling on body and html elements
           document.body.style.setProperty('overflow', 'auto', 'important');
           document.body.style.setProperty('position', 'static', 'important');
           document.documentElement.style.setProperty('overflow', 'auto', 'important');
@@ -180,9 +242,7 @@ export default async function handler(req) {
 
         // Client-side logo image replacement engine
         function replaceImages() {
-          const oldUrl = "${oldLogo}";
           const newUrl = "${newLogo}";
-
           document.querySelectorAll('img').forEach(function(img) {
             if (img.src && img.src.includes('images/logo.png')) {
               img.src = newUrl;
@@ -190,24 +250,77 @@ export default async function handler(req) {
           });
         }
 
+        // Group Header Control items inside a Dropdown Menu
+        function organizeHeaderControls() {
+          const controls = document.querySelector('.header-controls');
+          if (!controls || controls.dataset.menuConverted === "true") return;
+
+          // Wrap logic
+          controls.dataset.menuConverted = "true";
+
+          const menuWrapper = document.createElement('div');
+          menuWrapper.className = 'custom-menu-wrapper';
+
+          const menuBtn = document.createElement('button');
+          menuBtn.className = 'custom-menu-trigger';
+          menuBtn.innerHTML = '☰';
+          menuBtn.title = 'Menu';
+
+          const dropdownContent = document.createElement('div');
+          dropdownContent.className = 'custom-dropdown-content';
+
+          // Move all existing buttons inside menu
+          const buttons = Array.from(controls.children);
+          buttons.forEach(btn => {
+            if (btn.title) {
+              btn.innerHTML = btn.innerHTML + ' <span>' + btn.title + '</span>';
+            }
+            dropdownContent.appendChild(btn);
+          });
+
+          // Add Telegram Link Option inside Dropdown
+          const tgBtn = document.createElement('a');
+          tgBtn.className = 'custom-menu-tg-btn';
+          tgBtn.href = 'https://t.me/+poV8mzcMG4dkY2Vl';
+          tgBtn.target = '_blank';
+          tgBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.121l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.458c.538-.196 1.006.128.832.941z"/></svg> <span>Join Telegram</span>';
+          
+          dropdownContent.appendChild(tgBtn);
+
+          menuWrapper.appendChild(menuBtn);
+          menuWrapper.appendChild(dropdownContent);
+          controls.appendChild(menuWrapper);
+
+          // Toggle Event
+          menuBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            dropdownContent.classList.toggle('show');
+          });
+
+          document.addEventListener('click', function(e) {
+            if (!menuWrapper.contains(e.target)) {
+              dropdownContent.classList.remove('show');
+            }
+          });
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
           replaceDOMText();
           replaceImages();
+          organizeHeaderControls();
 
-          // Continuous DOM observer for dynamically rendered elements
           const observer = new MutationObserver(function() {
             replaceDOMText();
             replaceImages();
+            organizeHeaderControls();
           });
           observer.observe(document.body, { childList: true, subtree: true });
 
-          // Cleanup old popups continuously
           setInterval(function() {
             var oldPopups = document.querySelectorAll('#join-tg-popup-container');
             oldPopups.forEach(function(item) { item.remove(); });
           }, 400);
 
-          // Direct Event Binding
           var closeBtn = document.getElementById('srClose');
           var overlay = document.getElementById('srOverlay');
 
@@ -228,7 +341,6 @@ export default async function handler(req) {
         (function() {
           const myDomain = '${currentDomain}';
           
-          // Fetch Interceptor
           const originalFetch = window.fetch;
           window.fetch = function(...args) {
             if (typeof args[0] === 'string' && args[0].includes('vidcloud.eu.org')) {
@@ -237,7 +349,6 @@ export default async function handler(req) {
             return originalFetch.apply(this, args);
           };
 
-          // XHR Interceptor
           const originalXHR = window.XMLHttpRequest.prototype.open;
           window.XMLHttpRequest.prototype.open = function(method, url, ...rest) {
             if (typeof url === 'string' && url.includes('vidcloud.eu.org')) {
@@ -258,7 +369,7 @@ export default async function handler(req) {
           <div id="srSub">
             Stay updated with latest material<br>and notifications
           </div>
-          <a href="https://t.me/studystark" target="_blank" id="srBtn" onclick="closeSrModal()">
+          <a href="https://t.me/+poV8mzcMG4dkY2Vl" target="_blank" id="srBtn" onclick="closeSrModal()">
             Join Now
           </a>
         </div>
@@ -268,7 +379,7 @@ export default async function handler(req) {
       html = html.replace('</head>', injectedAssets);
       html = html.replace('</body>', newPopupHTML);
 
-      // Logo Image Replacements (Server-side)
+      // Logo Image Replacements
       html = html.replaceAll(oldLogo, newLogo);
       html = html.replaceAll('/images/logo.png', newLogo);
 
@@ -276,7 +387,7 @@ export default async function handler(req) {
       html = html.replaceAll('https://vidcloud.eu.org', currentDomain);
       html = html.replaceAll('vidcloud.eu.org', url.host);
 
-      // Name & Text Replacements (Server-side)
+      // Text Replacements
       html = html.replaceAll('Stark/PW Team', 'AURA MAX');
       html = html.replace(/studystark/gi, 'AURA MAX');
       html = html.replaceAll('Study Stark', 'AURA MAX');
@@ -296,7 +407,6 @@ export default async function handler(req) {
     if (contentType.includes('javascript') || contentType.includes('json')) {
       let text = await response.text();
       
-      // Logo Image Replacement in JS/JSON
       text = text.replaceAll(oldLogo, newLogo);
       text = text.replaceAll('/images/logo.png', newLogo);
 
