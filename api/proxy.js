@@ -56,23 +56,23 @@ export default async function handler(req) {
           pointer-events: none !important;
         }
 
-        /* Hide ONLY Top Action Telegram and WhatsApp Buttons (Keep Popup Intact) */
+        /* Hide ONLY Top Action Telegram and WhatsApp Buttons */
         .btn-top-action[href*="telegram.me"],
         .btn-top-action[href*="t.me"],
         .btn-top-action[href*="whatsapp.com"] {
           display: none !important;
         }
 
-        /* Custom Header Dropdown Menu Styles */
+        /* Matches Site Theme UI */
         .custom-menu-wrapper {
           position: relative;
           display: inline-block;
         }
         .custom-menu-trigger {
-          background: #1e1e2d;
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          color: #ffffff;
-          padding: 8px 12px;
+          background: #ffffff;
+          border: 1px solid #e2e8f0;
+          color: #5b42f3;
+          padding: 8px 14px;
           border-radius: 12px;
           cursor: pointer;
           font-size: 20px;
@@ -80,16 +80,21 @@ export default async function handler(req) {
           align-items: center;
           justify-content: center;
           outline: none;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+          transition: all 0.2s ease;
+        }
+        .custom-menu-trigger:active {
+          transform: scale(0.95);
         }
         .custom-dropdown-content {
           display: none;
           position: absolute;
           right: 0;
-          top: 110%;
-          background: #181824;
-          border: 1px solid rgba(255, 255, 255, 0.15);
-          min-width: 190px;
-          box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+          top: 115%;
+          background: #ffffff;
+          border: 1px solid #e2e8f0;
+          min-width: 200px;
+          box-shadow: 0 10px 25px rgba(0,0,0,0.1);
           border-radius: 16px;
           z-index: 999999;
           padding: 8px;
@@ -104,26 +109,38 @@ export default async function handler(req) {
           justify-content: flex-start !important;
           padding: 10px 14px !important;
           border-radius: 10px !important;
-          background: rgba(255, 255, 255, 0.05) !important;
-          border: none !important;
-          color: #fff !important;
+          background: #f8fafc !important;
+          border: 1px solid #edf2f7 !important;
+          color: #2d3748 !important;
           font-size: 14px !important;
-          gap: 10px !important;
+          font-weight: 500 !important;
+          gap: 12px !important;
+          box-shadow: none !important;
         }
         .custom-dropdown-content .header-btn:hover {
-          background: rgba(255, 255, 255, 0.12) !important;
+          background: #f1f5f9 !important;
+          color: #5b42f3 !important;
+        }
+        .custom-dropdown-content .header-btn svg {
+          fill: currentColor !important;
+          stroke: currentColor !important;
         }
         .custom-menu-tg-btn {
           display: flex;
           align-items: center;
           gap: 10px;
           background: #0088cc;
-          color: #ffffff;
+          color: #ffffff !important;
           text-decoration: none;
           padding: 10px 14px;
           border-radius: 10px;
           font-size: 14px;
           font-weight: 600;
+          box-shadow: 0 4px 10px rgba(0, 136, 204, 0.2);
+          transition: background 0.2s ease;
+        }
+        .custom-menu-tg-btn:hover {
+          background: #0077b5;
         }
 
         /* SR Popup Styles */
@@ -198,7 +215,7 @@ export default async function handler(req) {
         #srBtn {
           display: block;
           width: 100%;
-          background: #111111;
+          background: #5b42f3;
           color: #ffffff;
           text-decoration: none;
           padding: 14px 0;
@@ -250,12 +267,11 @@ export default async function handler(req) {
           });
         }
 
-        // Group Header Control items inside a Dropdown Menu
+        // Group Header Control items inside styled Dropdown Menu
         function organizeHeaderControls() {
           const controls = document.querySelector('.header-controls');
           if (!controls || controls.dataset.menuConverted === "true") return;
 
-          // Wrap logic
           controls.dataset.menuConverted = "true";
 
           const menuWrapper = document.createElement('div');
@@ -269,7 +285,6 @@ export default async function handler(req) {
           const dropdownContent = document.createElement('div');
           dropdownContent.className = 'custom-dropdown-content';
 
-          // Move all existing buttons inside menu
           const buttons = Array.from(controls.children);
           buttons.forEach(btn => {
             if (btn.title) {
@@ -278,7 +293,7 @@ export default async function handler(req) {
             dropdownContent.appendChild(btn);
           });
 
-          // Add Telegram Link Option inside Dropdown
+          // Add Telegram Link
           const tgBtn = document.createElement('a');
           tgBtn.className = 'custom-menu-tg-btn';
           tgBtn.href = 'https://t.me/+poV8mzcMG4dkY2Vl';
@@ -291,7 +306,7 @@ export default async function handler(req) {
           menuWrapper.appendChild(dropdownContent);
           controls.appendChild(menuWrapper);
 
-          // Toggle Event
+          // Toggle
           menuBtn.addEventListener('click', function(e) {
             e.stopPropagation();
             dropdownContent.classList.toggle('show');
@@ -379,7 +394,7 @@ export default async function handler(req) {
       html = html.replace('</head>', injectedAssets);
       html = html.replace('</body>', newPopupHTML);
 
-      // Logo Image Replacements
+      // Logo Replacements
       html = html.replaceAll(oldLogo, newLogo);
       html = html.replaceAll('/images/logo.png', newLogo);
 
