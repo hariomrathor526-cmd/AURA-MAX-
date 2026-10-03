@@ -21,6 +21,11 @@ export default async function handler(req) {
     });
   }
 
+  // Direct Image Proxy Redirect for Logo
+  if (url.pathname.includes('/images/logo.png')) {
+    return Response.redirect(newLogoUrl, 301);
+  }
+
   // 2. Target Forwarding
   const targetUrl = targetDomain + url.pathname + url.search;
 
@@ -59,12 +64,6 @@ export default async function handler(req) {
         .btn-top-action[href*="t.me"],
         .btn-top-action[href*="whatsapp.com"] {
           display: none !important;
-        }
-
-        /* Force Override CSS Background Logos if any */
-        [style*="logo.png"],
-        .logo-bg {
-          background-image: url('${newLogoUrl}') !important;
         }
 
         /* SR Popup Styles */
@@ -161,35 +160,31 @@ export default async function handler(req) {
           document.documentElement.style.setProperty('overflow', 'auto', 'important');
         }
 
-        // Deep DOM Replacer Engine
-        function forceDOMReplacement() {
-          const targetLogo = "${newLogoUrl}";
+        // Lightweight Safe Replacement Engine
+        function runSafeReplacement() {
+          const newLogo = "${newLogoUrl}";
 
-          // 1. Force Image replacements
-          const images = document.getElementsByTagName('img');
-          for (let i = 0; i < images.length; i++) {
-            let img = images[i];
-            if (img.src && (img.src.includes('logo') || img.src.includes('vidcloud.eu.org/images/'))) {
-              if (img.src !== targetLogo) {
-                img.src = targetLogo;
-              }
+          // Update Image Logos safely
+          const imgs = document.querySelectorAll('img');
+          imgs.forEach(function(img) {
+            if (img.src && (img.src.includes('logo') || img.src.includes('images/'))) {
+              if (img.src !== newLogo) img.src = newLogo;
             }
-          }
+          });
 
-          // 2. Direct Text replacements using TreeWalker
+          // Text Replacements safely
           const walker = document.createTreeWalker(
             document.body || document.documentElement,
             NodeFilter.SHOW_TEXT,
             null,
             false
           );
-
           let node;
           while (node = walker.nextNode()) {
             if (node.nodeValue && node.parentNode.id !== 'srPopup') {
-              let val = node.nodeValue;
-              if (/Stark\/PW Team|Study Stark|studystark|StudyStark/i.test(val)) {
-                node.nodeValue = val.replace(/Stark\/PW Team|Study Stark|studystark|StudyStark/gi, 'AURA MAX');
+              let text = node.nodeValue;
+              if (/Stark\/PW Team|Study Stark|studystark|StudyStark/i.test(text)) {
+                node.nodeValue = text.replace(/Stark\/PW Team|Study Stark|studystark|StudyStark/gi, 'AURA MAX');
               }
               if (/Dev Aryan/i.test(node.nodeValue)) {
                 node.nodeValue = node.nodeValue.replace(/Dev Aryan/gi, '₋⁻–RATHOR');
@@ -199,37 +194,35 @@ export default async function handler(req) {
         }
 
         document.addEventListener('DOMContentLoaded', function() {
-          forceDOMReplacement();
+          runSafeReplacement();
 
-          // Mutation Observer to continuous catch React rendering changes
+          // Throttled Observer to prevent UI Freezing
+          let isPending = false;
           const observer = new MutationObserver(function() {
-            forceDOMReplacement();
+            if (!isPending) {
+              isPending = true;
+              setTimeout(function() {
+                runSafeReplacement();
+                isPending = false;
+              }, 300);
+            }
           });
 
-          observer.observe(document.body || document.documentElement, {
-            childList: true,
-            subtree: true,
-            characterData: true
-          });
+          if (document.body) {
+            observer.observe(document.body, { childList: true, subtree: true });
+          }
 
-          // Cleanup old popups
-          setInterval(function() {
-            var oldPopups = document.querySelectorAll('#join-tg-popup-container');
-            oldPopups.forEach(function(item) { item.remove(); });
-          }, 400);
-
+          // Close button event binding
           var closeBtn = document.getElementById('srClose');
           var overlay = document.getElementById('srOverlay');
 
           if (closeBtn) {
-            closeBtn.addEventListener('click', closeSrModal);
-            closeBtn.addEventListener('touchstart', closeSrModal);
+            closeBtn.onclick = closeSrModal;
           }
-
           if (overlay) {
-            overlay.addEventListener('click', function(e) {
+            overlay.onclick = function(e) {
               if (e.target === overlay) closeSrModal();
-            });
+            };
           }
         });
 
@@ -257,7 +250,7 @@ export default async function handler(req) {
       const newPopupHTML = `
       <div id="srOverlay" class="sr-overlay">
         <div id="srPopup">
-          <div id="srClose" onclick="closeSrModal()" ontouchstart="closeSrModal()">✕</div>
+          <div id="srClose" onclick="closeSrModal()">✕</div>
           <div id="srIcon">📢</div>
           <div id="srTitle">Join Our Community</div>
           <div id="srSub">
