@@ -234,7 +234,7 @@ export default async function handler(req) {
       html = html.replaceAll('Study Stark', 'AURA MAX');
       html = html.replaceAll('VidCloud', 'AURA MAX');
       html = html.replaceAll('Dev Aryan', '₋⁻–RATHOR');
-      html = html.replaceAll('Stark', 'AURA MAX');
+      html = html.replaceAll('Stark/PW Team', 'AURA MAX');
 
       return new Response(html, {
         status: response.status,
