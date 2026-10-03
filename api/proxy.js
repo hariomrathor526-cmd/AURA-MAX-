@@ -6,6 +6,7 @@ export default async function handler(req) {
   const url = new URL(req.url);
   const currentDomain = url.origin; 
   const targetDomain = 'https://vidcloud.eu.org';
+  const newLogoUrl = 'https://cdn.phototourl.com/member/2026-10-02-62a99f01-301c-41f1-9584-0fd12ae4b326.jpg';
 
   // 1. Preflight CORS Requests
   if (req.method === 'OPTIONS') {
@@ -157,8 +158,18 @@ export default async function handler(req) {
           document.documentElement.style.setProperty('overflow', 'auto', 'important');
         }
 
-        // Client-side dynamic text replacement engine
-        function replaceDOMText() {
+        // Client-side dynamic text & image replacement engine
+        function replaceDOMContent() {
+          const newLogo = "${newLogoUrl}";
+          
+          // Image Src Replacements
+          document.querySelectorAll('img').forEach(function(img) {
+            if (img.src && (img.src.includes('/images/logo.png') || img.src.includes('vidcloud.eu.org/images/logo.png'))) {
+              img.src = newLogo;
+            }
+          });
+
+          // Text Replacements
           const walk = document.createTreeWalker(document.body || document.documentElement, NodeFilter.SHOW_TEXT, null, false);
           let node;
           while (node = walk.nextNode()) {
@@ -176,13 +187,13 @@ export default async function handler(req) {
         }
 
         document.addEventListener('DOMContentLoaded', function() {
-          replaceDOMText();
+          replaceDOMContent();
 
-          // Continuous DOM observer for dynamically rendered JS text
+          // Continuous DOM observer for dynamically rendered JS elements
           const observer = new MutationObserver(function() {
-            replaceDOMText();
+            replaceDOMContent();
           });
-          observer.observe(document.body, { childList: true, subtree: true });
+          observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['src'] });
 
           // Cleanup old popups continuously
           setInterval(function() {
@@ -255,6 +266,11 @@ export default async function handler(req) {
       html = html.replaceAll('https://vidcloud.eu.org', currentDomain);
       html = html.replaceAll('vidcloud.eu.org', url.host);
 
+      // Logo Image Replacements (Server-side)
+      html = html.replaceAll(`${currentDomain}/images/logo.png`, newLogoUrl);
+      html = html.replaceAll('https://vidcloud.eu.org/images/logo.png', newLogoUrl);
+      html = html.replaceAll('/images/logo.png', newLogoUrl);
+
       // Name & Text Replacements (Server-side)
       html = html.replaceAll('Stark/PW Team', 'AURA MAX');
       html = html.replace(/studystark/gi, 'AURA MAX');
@@ -276,6 +292,7 @@ export default async function handler(req) {
       let text = await response.text();
       text = text.replaceAll('https://vidcloud.eu.org', currentDomain);
       text = text.replaceAll('vidcloud.eu.org', url.host);
+      text = text.replaceAll('/images/logo.png', newLogoUrl);
       text = text.replaceAll('Stark/PW Team', 'AURA MAX');
       text = text.replace(/studystark/gi, 'AURA MAX');
       text = text.replaceAll('Dev Aryan', '₋⁻–RATHOR');
