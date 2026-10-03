@@ -53,10 +53,10 @@ export default async function handler(req) {
           pointer-events: none !important;
         }
 
-        /* Hide Telegram and WhatsApp Action Buttons from top bar */
-        a[href*="telegram.me"],
-        a[href*="t.me"],
-        a[href*="whatsapp.com"] {
+        /* Hide ONLY Top Action Telegram and WhatsApp Buttons (Keep Popup Intact) */
+        .btn-top-action[href*="telegram.me"],
+        .btn-top-action[href*="t.me"],
+        .btn-top-action[href*="whatsapp.com"] {
           display: none !important;
         }
 
@@ -231,7 +231,7 @@ export default async function handler(req) {
 
       // Name & Text Replacements
       html = html.replace(/studystark/gi, 'AURA MAX');
-      html = html.replaceAll('StudyStark', 'AURA MAX');
+      html = html.replaceAll('Study Stark', 'AURA MAX');
       html = html.replaceAll('VidCloud', 'AURA MAX');
       html = html.replaceAll('Dev Aryan', '₋⁻–RATHOR');
 
