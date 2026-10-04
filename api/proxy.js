@@ -7,9 +7,6 @@ export default async function handler(req) {
   const currentDomain = url.origin; 
   const targetDomain = 'https://vidcloud.eu.org';
 
-  const oldLogo = 'https://vidcloud.eu.org/images/logo.png';
-  const newLogo = 'https://cdn.phototourl.com/member/2026-10-02-62a99f01-301c-41f1-9584-0fd12ae4b326.jpg';
-
   // 1. Preflight CORS Requests
   if (req.method === 'OPTIONS') {
     return new Response(null, {
@@ -56,91 +53,11 @@ export default async function handler(req) {
           pointer-events: none !important;
         }
 
-        /* Hide ONLY Top Action Telegram and WhatsApp Buttons */
+        /* Hide ONLY Top Action Telegram and WhatsApp Buttons (Keep Popup Intact) */
         .btn-top-action[href*="telegram.me"],
         .btn-top-action[href*="t.me"],
         .btn-top-action[href*="whatsapp.com"] {
           display: none !important;
-        }
-
-        /* Matches Site Theme UI */
-        .custom-menu-wrapper {
-          position: relative;
-          display: inline-block;
-        }
-        .custom-menu-trigger {
-          background: #ffffff;
-          border: 1px solid #e2e8f0;
-          color: #5b42f3;
-          padding: 8px 14px;
-          border-radius: 12px;
-          cursor: pointer;
-          font-size: 20px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          outline: none;
-          box-shadow: 0 2px 6px rgba(0,0,0,0.05);
-          transition: all 0.2s ease;
-        }
-        .custom-menu-trigger:active {
-          transform: scale(0.95);
-        }
-        .custom-dropdown-content {
-          display: none;
-          position: absolute;
-          right: 0;
-          top: 115%;
-          background: #ffffff;
-          border: 1px solid #e2e8f0;
-          min-width: 200px;
-          box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-          border-radius: 16px;
-          z-index: 999999;
-          padding: 8px;
-          flex-direction: column;
-          gap: 6px;
-        }
-        .custom-dropdown-content.show {
-          display: flex !important;
-        }
-        .custom-dropdown-content .header-btn {
-          width: 100% !important;
-          justify-content: flex-start !important;
-          padding: 10px 14px !important;
-          border-radius: 10px !important;
-          background: #f8fafc !important;
-          border: 1px solid #edf2f7 !important;
-          color: #2d3748 !important;
-          font-size: 14px !important;
-          font-weight: 500 !important;
-          gap: 12px !important;
-          box-shadow: none !important;
-        }
-        .custom-dropdown-content .header-btn:hover {
-          background: #f1f5f9 !important;
-          color: #5b42f3 !important;
-        }
-        .custom-dropdown-content .header-btn svg {
-          fill: currentColor !important;
-          stroke: currentColor !important;
-        }
-        .custom-menu-tg-btn {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          background: #0088cc;
-          color: #ffffff !important;
-          text-decoration: none;
-          padding: 10px 14px;
-          border-radius: 10px;
-          font-size: 14px;
-          font-weight: 600;
-          box-shadow: 0 4px 10px rgba(0, 136, 204, 0.2);
-          transition: background 0.2s ease;
-        }
-        .custom-menu-tg-btn:hover {
-          background: #0077b5;
         }
 
         /* SR Popup Styles */
@@ -215,7 +132,7 @@ export default async function handler(req) {
         #srBtn {
           display: block;
           width: 100%;
-          background: #5b42f3;
+          background: #111111;
           color: #ffffff;
           text-decoration: none;
           padding: 14px 0;
@@ -234,6 +151,7 @@ export default async function handler(req) {
             el.remove();
           }
 
+          // Force enable scrolling on body and html elements
           document.body.style.setProperty('overflow', 'auto', 'important');
           document.body.style.setProperty('position', 'static', 'important');
           document.documentElement.style.setProperty('overflow', 'auto', 'important');
@@ -257,85 +175,22 @@ export default async function handler(req) {
           }
         }
 
-        // Client-side logo image replacement engine
-        function replaceImages() {
-          const newUrl = "${newLogo}";
-          document.querySelectorAll('img').forEach(function(img) {
-            if (img.src && img.src.includes('images/logo.png')) {
-              img.src = newUrl;
-            }
-          });
-        }
-
-        // Group Header Control items inside styled Dropdown Menu
-        function organizeHeaderControls() {
-          const controls = document.querySelector('.header-controls');
-          if (!controls || controls.dataset.menuConverted === "true") return;
-
-          controls.dataset.menuConverted = "true";
-
-          const menuWrapper = document.createElement('div');
-          menuWrapper.className = 'custom-menu-wrapper';
-
-          const menuBtn = document.createElement('button');
-          menuBtn.className = 'custom-menu-trigger';
-          menuBtn.innerHTML = '☰';
-          menuBtn.title = 'Menu';
-
-          const dropdownContent = document.createElement('div');
-          dropdownContent.className = 'custom-dropdown-content';
-
-          const buttons = Array.from(controls.children);
-          buttons.forEach(btn => {
-            if (btn.title) {
-              btn.innerHTML = btn.innerHTML + ' <span>' + btn.title + '</span>';
-            }
-            dropdownContent.appendChild(btn);
-          });
-
-          // Add Telegram Link
-          const tgBtn = document.createElement('a');
-          tgBtn.className = 'custom-menu-tg-btn';
-          tgBtn.href = 'https://t.me/+poV8mzcMG4dkY2Vl';
-          tgBtn.target = '_blank';
-          tgBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.121l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.458c.538-.196 1.006.128.832.941z"/></svg> <span>Join Telegram</span>';
-          
-          dropdownContent.appendChild(tgBtn);
-
-          menuWrapper.appendChild(menuBtn);
-          menuWrapper.appendChild(dropdownContent);
-          controls.appendChild(menuWrapper);
-
-          // Toggle
-          menuBtn.addEventListener('click', function(e) {
-            e.stopPropagation();
-            dropdownContent.classList.toggle('show');
-          });
-
-          document.addEventListener('click', function(e) {
-            if (!menuWrapper.contains(e.target)) {
-              dropdownContent.classList.remove('show');
-            }
-          });
-        }
-
         document.addEventListener('DOMContentLoaded', function() {
           replaceDOMText();
-          replaceImages();
-          organizeHeaderControls();
 
+          // Continuous DOM observer for dynamically rendered JS text
           const observer = new MutationObserver(function() {
             replaceDOMText();
-            replaceImages();
-            organizeHeaderControls();
           });
           observer.observe(document.body, { childList: true, subtree: true });
 
+          // Cleanup old popups continuously
           setInterval(function() {
             var oldPopups = document.querySelectorAll('#join-tg-popup-container');
             oldPopups.forEach(function(item) { item.remove(); });
           }, 400);
 
+          // Direct Event Binding
           var closeBtn = document.getElementById('srClose');
           var overlay = document.getElementById('srOverlay');
 
@@ -356,6 +211,7 @@ export default async function handler(req) {
         (function() {
           const myDomain = '${currentDomain}';
           
+          // Fetch Interceptor
           const originalFetch = window.fetch;
           window.fetch = function(...args) {
             if (typeof args[0] === 'string' && args[0].includes('vidcloud.eu.org')) {
@@ -364,6 +220,7 @@ export default async function handler(req) {
             return originalFetch.apply(this, args);
           };
 
+          // XHR Interceptor
           const originalXHR = window.XMLHttpRequest.prototype.open;
           window.XMLHttpRequest.prototype.open = function(method, url, ...rest) {
             if (typeof url === 'string' && url.includes('vidcloud.eu.org')) {
@@ -384,7 +241,7 @@ export default async function handler(req) {
           <div id="srSub">
             Stay updated with latest material<br>and notifications
           </div>
-          <a href="https://t.me/+poV8mzcMG4dkY2Vl" target="_blank" id="srBtn" onclick="closeSrModal()">
+          <a href="https://t.me/studystark" target="_blank" id="srBtn" onclick="closeSrModal()">
             Join Now
           </a>
         </div>
@@ -394,15 +251,11 @@ export default async function handler(req) {
       html = html.replace('</head>', injectedAssets);
       html = html.replace('</body>', newPopupHTML);
 
-      // Logo Replacements
-      html = html.replaceAll(oldLogo, newLogo);
-      html = html.replaceAll('/images/logo.png', newLogo);
-
       // Rebranding
       html = html.replaceAll('https://vidcloud.eu.org', currentDomain);
       html = html.replaceAll('vidcloud.eu.org', url.host);
 
-      // Text Replacements
+      // Name & Text Replacements (Server-side)
       html = html.replaceAll('Stark/PW Team', 'AURA MAX');
       html = html.replace(/studystark/gi, 'AURA MAX');
       html = html.replaceAll('Study Stark', 'AURA MAX');
@@ -421,10 +274,6 @@ export default async function handler(req) {
     // 4. JS & JSON Handlers
     if (contentType.includes('javascript') || contentType.includes('json')) {
       let text = await response.text();
-      
-      text = text.replaceAll(oldLogo, newLogo);
-      text = text.replaceAll('/images/logo.png', newLogo);
-
       text = text.replaceAll('https://vidcloud.eu.org', currentDomain);
       text = text.replaceAll('vidcloud.eu.org', url.host);
       text = text.replaceAll('Stark/PW Team', 'AURA MAX');
