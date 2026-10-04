@@ -21,16 +21,26 @@ export default async function handler(req) {
   }
 
   // 2. Target Forwarding
-  const targetUrl = targetDomain + url.pathname + url.search;
+  let targetUrl = targetDomain + url.pathname + url.search;
 
-  // Clean Headers Object for CDN Validation
+  // Agar Bunny CDN request direct aati hai (Path prefixing check)
+  if (url.pathname.startsWith('/cdn-proxy/')) {
+    const originalCdnPath = url.pathname.replace('/cdn-proxy/', '');
+    targetUrl = `https://bunny-cdn-qbg-s6.testwave.cc/${originalCdnPath}${url.search}`;
+  }
+
+  // Clean Headers with Video Range Support
   const forwardHeaders = {
     'accept': req.headers.get('accept') || '*/*',
     'accept-language': req.headers.get('accept-language') || 'en-US,en;q=0.9',
-    'user-agent': req.headers.get('user-agent') || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'user-agent': req.headers.get('user-agent') || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
     'referer': 'https://vidcloud.eu.org/',
     'origin': 'https://vidcloud.eu.org',
   };
+
+  if (req.headers.has('range')) {
+    forwardHeaders['range'] = req.headers.get('range');
+  }
 
   try {
     const response = await fetch(targetUrl, {
@@ -42,7 +52,7 @@ export default async function handler(req) {
 
     const contentType = response.headers.get('content-type') || '';
 
-    // 3. HTML Interception & Scroll Fix Injection
+    // 3. HTML Interception & Video CDN Interception Injection
     if (contentType.includes('text/html')) {
       let html = await response.text();
 
@@ -173,22 +183,32 @@ export default async function handler(req) {
           }
         });
 
+        // Intercept BOTH Target API Domain AND Bunny CDN URLs
         (function() {
           const myDomain = '${currentDomain}';
-          
+          const cdnHost = 'bunny-cdn-qbg-s6.testwave.cc';
+
+          function rewriteUrl(inputUrl) {
+            if (typeof inputUrl !== 'string') return inputUrl;
+
+            if (inputUrl.includes('vidcloud.eu.org')) {
+              return inputUrl.replace('https://vidcloud.eu.org', myDomain);
+            }
+            if (inputUrl.includes(cdnHost)) {
+              return inputUrl.replace('https://' + cdnHost, myDomain + '/cdn-proxy');
+            }
+            return inputUrl;
+          }
+
           const originalFetch = window.fetch;
           window.fetch = function(...args) {
-            if (typeof args[0] === 'string' && args[0].includes('vidcloud.eu.org')) {
-              args[0] = args[0].replace('https://vidcloud.eu.org', myDomain);
-            }
+            args[0] = rewriteUrl(args[0]);
             return originalFetch.apply(this, args);
           };
 
           const originalXHR = window.XMLHttpRequest.prototype.open;
           window.XMLHttpRequest.prototype.open = function(method, url, ...rest) {
-            if (typeof url === 'string' && url.includes('vidcloud.eu.org')) {
-              url = url.replace('https://vidcloud.eu.org', myDomain);
-            }
+            url = rewriteUrl(url);
             return originalXHR.call(this, method, url, ...rest);
           };
         })();
@@ -216,6 +236,7 @@ export default async function handler(req) {
 
       html = html.replaceAll('https://vidcloud.eu.org', currentDomain);
       html = html.replaceAll('vidcloud.eu.org', url.host);
+      html = html.replaceAll('https://bunny-cdn-qbg-s6.testwave.cc', currentDomain + '/cdn-proxy');
       html = html.replaceAll('Study Stark', 'AURA MAX');
       html = html.replaceAll('VidCloud', 'AURA MAX');
 
@@ -233,6 +254,7 @@ export default async function handler(req) {
       let text = await response.text();
       text = text.replaceAll('https://vidcloud.eu.org', currentDomain);
       text = text.replaceAll('vidcloud.eu.org', url.host);
+      text = text.replaceAll('https://bunny-cdn-qbg-s6.testwave.cc', currentDomain + '/cdn-proxy');
 
       return new Response(text, {
         status: response.status,
@@ -243,7 +265,7 @@ export default async function handler(req) {
       });
     }
 
-    // 5. Media & Streams (Bunny CDN Video Files / DOCX / MP4)
+    // 5. Streaming Video/Media Streams Handling
     const resHeaders = new Headers(response.headers);
     resHeaders.set('access-control-allow-origin', '*');
     resHeaders.set('access-control-allow-methods', 'GET, POST, PUT, DELETE, OPTIONS');
