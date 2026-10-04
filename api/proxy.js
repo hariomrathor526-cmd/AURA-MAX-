@@ -1,222 +1,130 @@
-export const config = {
-  runtime: 'edge',
-};
+export default {
+          async fetch(request, env, ctx) {
+              const url = new URL(request.url);
+                  const currentDomain = url.origin;
+                      const targetDomain = 'https://vidcloud.eu.org';
 
-export default async function handler(req) {
-  const url = new URL(req.url);
-  const currentDomain = url.origin; 
-  const targetDomain = 'https://vidcloud.eu.org';
-  const cdnHost = 'bunny-cdn-qbg-s6.testwave.cc';
-  const cloudfrontHost = 'd1d34p8vz63oiq.cloudfront.net';
+                          // 1. Static Assets (Images/CSS/JS/Fonts) ko Direct Pass Karein (Rate Limit Se Bachne Ke Liye)
+                              const pathname = url.pathname.toLowerCase();
+                                  if (
+                                        pathname.endsWith('.png') || 
+                                              pathname.endsWith('.jpg') || 
+                                                    pathname.endsWith('.jpeg') || 
+                                                          pathname.endsWith('.svg') || 
+                                                                pathname.endsWith('.woff2') || 
+                                                                      pathname.endsWith('.css')
+                                                                          ) {
+                                                                                return fetch(targetDomain + url.pathname + url.search, {
+                                                                                        headers: {
+                                                                                                  'host': 'vidcloud.eu.org',
+                                                                                                            'referer': 'https://vidcloud.eu.org/',
+                                                                                                                      'user-agent': request.headers.get('user-agent') || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+                                                                                                                              }
+                                                                                                                                    });
+                                                                                                                                        }
 
-  // 1. Preflight CORS Requests
-  if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      status: 200,
-      headers: {
-        'access-control-allow-origin': '*',
-        'access-control-allow-methods': 'GET, POST, PUT, DELETE, OPTIONS',
-        'access-control-allow-headers': '*',
-        'access-control-max-age': '86400',
-      },
-    });
-  }
+                                                                                                                                            // 2. CORS Preflight (OPTIONS)
+                                                                                                                                                if (request.method === 'OPTIONS') {
+                                                                                                                                                      return new Response(null, {
+                                                                                                                                                              status: 200,
+                                                                                                                                                                      headers: {
+                                                                                                                                                                                'access-control-allow-origin': '*',
+                                                                                                                                                                                          'access-control-allow-methods': 'GET, POST, PUT, DELETE, OPTIONS',
+                                                                                                                                                                                                    'access-control-allow-headers': '*',
+                                                                                                                                                                                                              'access-control-max-age': '86400',
+                                                                                                                                                                                                                      },
+                                                                                                                                                                                                                            });
+                                                                                                                                                                                                                                }
 
-  // 2. Target Routing Determination
-  let targetUrl = '';
-  let activeHost = 'vidcloud.eu.org';
-  let isMediaProxy = false;
+                                                                                                                                                                                                                                    const targetUrl = targetDomain + url.pathname + url.search;
 
-  if (url.pathname.startsWith('/cdn-proxy/')) {
-    isMediaProxy = true;
-    activeHost = cdnHost;
-    const realPath = url.pathname.replace('/cdn-proxy/', '');
-    targetUrl = `https://${cdnHost}/${realPath}${url.search}`;
-  } else if (url.pathname.startsWith('/cf-proxy/')) {
-    isMediaProxy = true;
-    activeHost = cloudfrontHost;
-    const realPath = url.pathname.replace('/cf-proxy/', '');
-    targetUrl = `https://${cloudfrontHost}/${realPath}${url.search}`;
-  } else {
-    targetUrl = targetDomain + url.pathname + url.search;
-  }
+                                                                                                                                                                                                                                        // Real Browser User-Agent Spoofing
+                                                                                                                                                                                                                                            const forwardHeaders = new Headers(request.headers);
+                                                                                                                                                                                                                                                forwardHeaders.set('host', 'vidcloud.eu.org');
+                                                                                                                                                                                                                                                    forwardHeaders.set('referer', 'https://vidcloud.eu.org/');
+                                                                                                                                                                                                                                                        forwardHeaders.set('user-agent', 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36');
+                                                                                                                                                                                                                                                            forwardHeaders.delete('accept-encoding');
 
-  // 3. Request Headers Setup
-  const forwardHeaders = {
-    'accept': req.headers.get('accept') || '*/*',
-    'accept-language': req.headers.get('accept-language') || 'en-US,en;q=0.9',
-    'user-agent': req.headers.get('user-agent') || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'host': activeHost,
-    'referer': 'https://vidcloud.eu.org/',
-    'origin': 'https://vidcloud.eu.org',
-  };
+                                                                                                                                                                                                                                                                try {
+                                                                                                                                                                                                                                                                      const response = await fetch(targetUrl, {
+                                                                                                                                                                                                                                                                              method: request.method,
+                                                                                                                                                                                                                                                                                      headers: forwardHeaders,
+                                                                                                                                                                                                                                                                                              body: request.method !== 'GET' && request.method !== 'HEAD' ? request.body : null,
+                                                                                                                                                                                                                                                                                                    });
 
-  if (req.headers.has('range')) {
-    forwardHeaders['range'] = req.headers.get('range');
-  }
+                                                                                                                                                                                                                                                                                                          const contentType = response.headers.get('content-type') || '';
 
-  try {
-    const response = await fetch(targetUrl, {
-      method: req.method,
-      headers: forwardHeaders,
-      body: req.method !== 'GET' && req.method !== 'HEAD' ? req.body : null,
-      redirect: 'follow',
-    });
+                                                                                                                                                                                                                                                                                                                // 3. HTML Text Replacements
+                                                                                                                                                                                                                                                                                                                      if (contentType.includes('text/html')) {
+                                                                                                                                                                                                                                                                                                                              let html = await response.text();
 
-    // Directly stream CloudFront / Bunny CDN media files
-    if (isMediaProxy) {
-      const mediaResHeaders = new Headers(response.headers);
-      mediaResHeaders.set('access-control-allow-origin', '*');
-      mediaResHeaders.set('access-control-allow-methods', 'GET, POST, OPTIONS');
-      return new Response(response.body, {
-        status: response.status,
-        headers: mediaResHeaders,
-      });
-    }
+                                                                                                                                                                                                                                                                                                                                      const scriptInjector = `
+                                                                                                                                                                                                                                                                                                                                              <script>
+                                                                                                                                                                                                                                                                                                                                                        (function() {
+                                                                                                                                                                                                                                                                                                                                                                    const myDomain = '${currentDomain}';
+                                                                                                                                                                                                                                                                                                                                                                                
+                                                                                                                                                                                                                                                                                                                                                                                            const originalFetch = window.fetch;
+                                                                                                                                                                                                                                                                                                                                                                                                        window.fetch = function(...args) {
+                                                                                                                                                                                                                                                                                                                                                                                                                      if (typeof args[0] === 'string' && args[0].includes('vidcloud.eu.org')) {
+                                                                                                                                                                                                                                                                                                                                                                                                                                      args[0] = args[0].replace('https://vidcloud.eu.org', myDomain);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                    }
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                  return originalFetch.apply(this, args);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                              };
 
-    const contentType = response.headers.get('content-type') || '';
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          const originalXHR = window.XMLHttpRequest.prototype.open;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      window.XMLHttpRequest.prototype.open = function(method, url, ...rest) {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    if (typeof url === 'string' && url.includes('vidcloud.eu.org')) {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    url = url.replace('https://vidcloud.eu.org', myDomain);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  }
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                return originalXHR.call(this, method, url, ...rest);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            };
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      })();
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              </script>
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      </head>`;
 
-    // 4. HTML Interception & Multi-CDN Rewrite Injection
-    if (contentType.includes('text/html')) {
-      let html = await response.text();
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              html = html.replace('</head>', scriptInjector);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      html = html.replaceAll('https://vidcloud.eu.org', currentDomain);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              html = html.replaceAll('vidcloud.eu.org', url.host);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      html = html.replaceAll('Study Stark', 'AURA MAX');
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              html = html.replaceAll('VidCloud', 'AURA MAX');
 
-      const injectedAssets = `
-      <style>
-        #join-tg-popup-container, [id*="join-tg-popup"] {
-          display: none !important; visibility: hidden !important; opacity: 0 !important; pointer-events: none !important;
-        }
-        .sr-overlay {
-          position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.4);
-          display: flex; align-items: center; justify-content: center; z-index: 9999999 !important; backdrop-filter: blur(2px);
-        }
-        #srPopup {
-          background: #ffffff; width: 88%; max-width: 380px; border-radius: 28px; padding: 35px 24px 28px 24px;
-          text-align: center; position: relative; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15); font-family: sans-serif;
-        }
-        #srClose {
-          position: absolute; top: 16px; right: 16px; width: 36px; height: 36px; background: #f2f2f4;
-          border: none; border-radius: 50%; font-size: 16px; color: #333; cursor: pointer; display: flex; align-items: center; justify-content: center;
-        }
-        #srIcon { width: 70px; height: 70px; background: #f6f6f8; border-radius: 50%; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center; font-size: 32px; }
-        #srTitle { font-size: 22px; font-weight: 700; color: #000; margin-bottom: 10px; }
-        #srSub { font-size: 14px; color: #666; line-height: 1.4; margin-bottom: 26px; }
-        #srBtn { display: block; width: 100%; background: #111; color: #fff; text-decoration: none; padding: 14px 0; border-radius: 16px; font-size: 16px; font-weight: 600; }
-      </style>
-      <script>
-        function closeSrModal() {
-          var el = document.getElementById('srOverlay');
-          if (el) el.remove();
-          document.body.style.setProperty('overflow', 'auto', 'important');
-          document.documentElement.style.setProperty('overflow', 'auto', 'important');
-        }
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      return new Response(html, {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                status: response.status,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          headers: {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      'content-type': 'text/html; charset=utf-8',
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  'access-control-allow-origin': '*',
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            },
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    });
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          }
 
-        document.addEventListener('DOMContentLoaded', function() {
-          setInterval(function() {
-            var oldPopups = document.querySelectorAll('#join-tg-popup-container');
-            oldPopups.forEach(function(item) { item.remove(); });
-          }, 400);
-        });
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                // 4. JS & JSON Rewriting
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      if (contentType.includes('javascript') || contentType.includes('json')) {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              let text = await response.text();
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      text = text.replaceAll('https://vidcloud.eu.org', currentDomain);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              text = text.replaceAll('vidcloud.eu.org', url.host);
 
-        (function() {
-          const myDomain = '${currentDomain}';
-          const cdnHost = '${cdnHost}';
-          const cfHost = '${cloudfrontHost}';
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      return new Response(text, {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                status: response.status,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          headers: {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      'content-type': contentType,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  'access-control-allow-origin': '*',
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            },
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    });
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          }
 
-          function rewriteUrl(inputUrl) {
-            if (typeof inputUrl !== 'string') return inputUrl;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                // 5. Media & Other Requests
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      const modifiedHeaders = new Headers(response.headers);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            modifiedHeaders.set('access-control-allow-origin', '*');
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  modifiedHeaders.set('access-control-allow-methods', 'GET, POST, PUT, DELETE, OPTIONS');
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        modifiedHeaders.set('access-control-allow-headers', '*',);
 
-            if (inputUrl.includes('vidcloud.eu.org')) {
-              return inputUrl.replace('https://vidcloud.eu.org', myDomain);
-            }
-            if (inputUrl.includes(cdnHost)) {
-              return inputUrl.replace('https://' + cdnHost, myDomain + '/cdn-proxy');
-            }
-            if (inputUrl.includes(cfHost)) {
-              return inputUrl.replace('https://' + cfHost, myDomain + '/cf-proxy');
-            }
-            return inputUrl;
-          }
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              return new Response(response.body, {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      status: response.status,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              headers: modifiedHeaders,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    });
 
-          // 1. Fetch Interceptor (HLS/DASH Player calls)
-          const originalFetch = window.fetch;
-          window.fetch = function(...args) {
-            args[0] = rewriteUrl(args[0]);
-            return originalFetch.apply(this, args);
-          };
-
-          // 2. XHR Interceptor
-          const originalXHR = window.XMLHttpRequest.prototype.open;
-          window.XMLHttpRequest.prototype.open = function(method, url, ...rest) {
-            url = rewriteUrl(url);
-            return originalXHR.call(this, method, url, ...rest);
-          };
-
-          // 3. Media src Setter Interceptor
-          const originalSrcDescriptor = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'src');
-          if (originalSrcDescriptor) {
-            Object.defineProperty(HTMLMediaElement.prototype, 'src', {
-              set: function(val) {
-                return originalSrcDescriptor.set.call(this, rewriteUrl(val));
-              },
-              get: function() {
-                return originalSrcDescriptor.get.call(this);
-              }
-            });
-          }
-        })();
-      </script>
-      </head>`;
-
-      const newPopupHTML = `
-      <div id="srOverlay" class="sr-overlay">
-        <div id="srPopup">
-          <div id="srClose" onclick="closeSrModal()">✕</div>
-          <div id="srIcon">📢</div>
-          <div id="srTitle">Join Our Community</div>
-          <div id="srSub">Stay updated with latest material<br>and notifications</div>
-          <a href="https://t.me/studystark" target="_blank" id="srBtn" onclick="closeSrModal()">Join Now</a>
-        </div>
-      </div>
-      </body>`;
-
-      html = html.replace('</head>', injectedAssets);
-      html = html.replace('</body>', newPopupHTML);
-
-      // Global Domain & Asset Replacements
-      html = html.replaceAll('https://vidcloud.eu.org', currentDomain);
-      html = html.replaceAll('vidcloud.eu.org', url.host);
-      html = html.replaceAll(`https://${cdnHost}`, `${currentDomain}/cdn-proxy`);
-      html = html.replaceAll(cdnHost, `${url.host}/cdn-proxy`);
-      html = html.replaceAll(`https://${cloudfrontHost}`, `${currentDomain}/cf-proxy`);
-      html = html.replaceAll(cloudfrontHost, `${url.host}/cf-proxy`);
-      html = html.replaceAll('Study Stark', 'AURA MAX');
-      html = html.replaceAll('VidCloud', 'AURA MAX');
-
-      return new Response(html, {
-        status: response.status,
-        headers: { 'content-type': 'text/html; charset=utf-8', 'access-control-allow-origin': '*' },
-      });
-    }
-
-    // 5. JS & JSON Dynamic Rewriting
-    if (contentType.includes('javascript') || contentType.includes('json')) {
-      let text = await response.text();
-      text = text.replaceAll('https://vidcloud.eu.org', currentDomain);
-      text = text.replaceAll('vidcloud.eu.org', url.host);
-      text = text.replaceAll(`https://${cdnHost}`, `${currentDomain}/cdn-proxy`);
-      text = text.replaceAll(cdnHost, `${url.host}/cdn-proxy`);
-      text = text.replaceAll(`https://${cloudfrontHost}`, `${currentDomain}/cf-proxy`);
-      text = text.replaceAll(cloudfrontHost, `${url.host}/cf-proxy`);
-
-      return new Response(text, {
-        status: response.status,
-        headers: { 'content-type': contentType, 'access-control-allow-origin': '*' },
-      });
-    }
-
-    return new Response(response.body, { status: response.status, headers: response.headers });
-
-  } catch (error) {
-    return new Response('Proxy Error: ' + error.message, { status: 500 });
-  }
-}
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        } catch (error) {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              return new Response('Proxy Error: ' + error.message, { status: 500 });
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  }
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    }
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    };
