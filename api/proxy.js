@@ -23,17 +23,21 @@ export default async function handler(req) {
   // 2. Target Forwarding
   const targetUrl = targetDomain + url.pathname + url.search;
 
-  const forwardHeaders = new Headers(req.headers);
-  forwardHeaders.set('host', 'vidcloud.eu.org');
-  forwardHeaders.set('referer', 'https://vidcloud.eu.org/');
-  forwardHeaders.set('origin', 'https://vidcloud.eu.org');
-  forwardHeaders.delete('accept-encoding');
+  // Clean Headers Object for CDN Validation
+  const forwardHeaders = {
+    'accept': req.headers.get('accept') || '*/*',
+    'accept-language': req.headers.get('accept-language') || 'en-US,en;q=0.9',
+    'user-agent': req.headers.get('user-agent') || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'referer': 'https://vidcloud.eu.org/',
+    'origin': 'https://vidcloud.eu.org',
+  };
 
   try {
     const response = await fetch(targetUrl, {
       method: req.method,
       headers: forwardHeaders,
       body: req.method !== 'GET' && req.method !== 'HEAD' ? req.body : null,
+      redirect: 'follow',
     });
 
     const contentType = response.headers.get('content-type') || '';
@@ -44,7 +48,6 @@ export default async function handler(req) {
 
       const injectedAssets = `
       <style>
-        /* Hide Original Telegram Popup Completely */
         #join-tg-popup-container, 
         [id*="join-tg-popup"] {
           display: none !important;
@@ -53,7 +56,6 @@ export default async function handler(req) {
           pointer-events: none !important;
         }
 
-        /* SR Popup Styles */
         .sr-overlay {
           position: fixed;
           top: 0;
@@ -136,7 +138,6 @@ export default async function handler(req) {
         }
       </style>
       <script>
-        // Instant Close & Unfreeze Scrolling Function
         function closeSrModal() {
           var el = document.getElementById('srOverlay');
           if (el) {
@@ -144,20 +145,17 @@ export default async function handler(req) {
             el.remove();
           }
 
-          // Force enable scrolling on body and html elements
           document.body.style.setProperty('overflow', 'auto', 'important');
           document.body.style.setProperty('position', 'static', 'important');
           document.documentElement.style.setProperty('overflow', 'auto', 'important');
         }
 
         document.addEventListener('DOMContentLoaded', function() {
-          // Cleanup old popups continuously
           setInterval(function() {
             var oldPopups = document.querySelectorAll('#join-tg-popup-container');
             oldPopups.forEach(function(item) { item.remove(); });
           }, 400);
 
-          // Direct Event Binding
           var closeBtn = document.getElementById('srClose');
           var overlay = document.getElementById('srOverlay');
 
@@ -178,7 +176,6 @@ export default async function handler(req) {
         (function() {
           const myDomain = '${currentDomain}';
           
-          // Fetch Interceptor
           const originalFetch = window.fetch;
           window.fetch = function(...args) {
             if (typeof args[0] === 'string' && args[0].includes('vidcloud.eu.org')) {
@@ -187,7 +184,6 @@ export default async function handler(req) {
             return originalFetch.apply(this, args);
           };
 
-          // XHR Interceptor
           const originalXHR = window.XMLHttpRequest.prototype.open;
           window.XMLHttpRequest.prototype.open = function(method, url, ...rest) {
             if (typeof url === 'string' && url.includes('vidcloud.eu.org')) {
@@ -218,7 +214,6 @@ export default async function handler(req) {
       html = html.replace('</head>', injectedAssets);
       html = html.replace('</body>', newPopupHTML);
 
-      // Rebranding
       html = html.replaceAll('https://vidcloud.eu.org', currentDomain);
       html = html.replaceAll('vidcloud.eu.org', url.host);
       html = html.replaceAll('Study Stark', 'AURA MAX');
@@ -248,18 +243,17 @@ export default async function handler(req) {
       });
     }
 
-    // 5. Media & Streams
-    const modifiedHeaders = new Headers(response.headers);
-    modifiedHeaders.set('access-control-allow-origin', '*');
-    modifiedHeaders.set('access-control-allow-methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    modifiedHeaders.set('access-control-allow-headers', '*');
+    // 5. Media & Streams (Bunny CDN Video Files / DOCX / MP4)
+    const resHeaders = new Headers(response.headers);
+    resHeaders.set('access-control-allow-origin', '*');
+    resHeaders.set('access-control-allow-methods', 'GET, POST, PUT, DELETE, OPTIONS');
 
     return new Response(response.body, {
       status: response.status,
-      headers: modifiedHeaders,
+      headers: resHeaders,
     });
 
   } catch (error) {
     return new Response('Proxy Error: ' + error.message, { status: 500 });
   }
-}  
+}
