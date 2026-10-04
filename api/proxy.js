@@ -6,6 +6,7 @@ export default async function handler(req) {
   const url = new URL(req.url);
   const currentDomain = url.origin; 
   const targetDomain = 'https://vidcloud.eu.org';
+  const cdnHost = 'bunny-cdn-qbg-s6.testwave.cc';
 
   // 1. Preflight CORS Requests
   if (req.method === 'OPTIONS') {
@@ -20,16 +21,16 @@ export default async function handler(req) {
     });
   }
 
-  // 2. Target Forwarding
+  // 2. Route Target Determination
   let targetUrl = targetDomain + url.pathname + url.search;
 
-  // Agar Bunny CDN request direct aati hai (Path prefixing check)
+  // Handle CDN Proxy Route
   if (url.pathname.startsWith('/cdn-proxy/')) {
     const originalCdnPath = url.pathname.replace('/cdn-proxy/', '');
-    targetUrl = `https://bunny-cdn-qbg-s6.testwave.cc/${originalCdnPath}${url.search}`;
+    targetUrl = `https://${cdnHost}/${originalCdnPath}${url.search}`;
   }
 
-  // Clean Headers with Video Range Support
+  // Forward Headers
   const forwardHeaders = {
     'accept': req.headers.get('accept') || '*/*',
     'accept-language': req.headers.get('accept-language') || 'en-US,en;q=0.9',
@@ -52,7 +53,7 @@ export default async function handler(req) {
 
     const contentType = response.headers.get('content-type') || '';
 
-    // 3. HTML Interception & Video CDN Interception Injection
+    // 3. HTML Interception & Interceptor Injection
     if (contentType.includes('text/html')) {
       let html = await response.text();
 
@@ -183,10 +184,10 @@ export default async function handler(req) {
           }
         });
 
-        // Intercept BOTH Target API Domain AND Bunny CDN URLs
+        // Deep Interception System (Fetch, XHR, and HTML Video Elements)
         (function() {
           const myDomain = '${currentDomain}';
-          const cdnHost = 'bunny-cdn-qbg-s6.testwave.cc';
+          const cdnHost = '${cdnHost}';
 
           function rewriteUrl(inputUrl) {
             if (typeof inputUrl !== 'string') return inputUrl;
@@ -200,17 +201,47 @@ export default async function handler(req) {
             return inputUrl;
           }
 
+          // 1. Fetch Interceptor
           const originalFetch = window.fetch;
           window.fetch = function(...args) {
             args[0] = rewriteUrl(args[0]);
             return originalFetch.apply(this, args);
           };
 
+          // 2. XHR Interceptor
           const originalXHR = window.XMLHttpRequest.prototype.open;
           window.XMLHttpRequest.prototype.open = function(method, url, ...rest) {
             url = rewriteUrl(url);
             return originalXHR.call(this, method, url, ...rest);
           };
+
+          // 3. HTML Video/Audio Prototype Interceptor
+          const originalSrcDescriptor = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'src');
+          if (originalSrcDescriptor) {
+            Object.defineProperty(HTMLMediaElement.prototype, 'src', {
+              set: function(val) {
+                return originalSrcDescriptor.set.call(this, rewriteUrl(val));
+              },
+              get: function() {
+                return originalSrcDescriptor.get.call(this);
+              }
+            });
+          }
+
+          // 4. MutationObserver for Dynamic Elements Injection
+          const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+              mutation.addedNodes.forEach((node) => {
+                if (node.tagName === 'VIDEO' || node.tagName === 'SOURCE' || node.tagName === 'IFRAME') {
+                  if (node.src && node.src.includes(cdnHost)) {
+                    node.src = rewriteUrl(node.src);
+                  }
+                }
+              });
+            });
+          });
+
+          observer.observe(document.documentElement, { childList: true, subtree: true });
         })();
       </script>
       </head>`;
@@ -234,9 +265,11 @@ export default async function handler(req) {
       html = html.replace('</head>', injectedAssets);
       html = html.replace('</body>', newPopupHTML);
 
+      // DOM String Replacement
       html = html.replaceAll('https://vidcloud.eu.org', currentDomain);
       html = html.replaceAll('vidcloud.eu.org', url.host);
-      html = html.replaceAll('https://bunny-cdn-qbg-s6.testwave.cc', currentDomain + '/cdn-proxy');
+      html = html.replaceAll(`https://${cdnHost}`, `${currentDomain}/cdn-proxy`);
+      html = html.replaceAll(cdnHost, `${url.host}/cdn-proxy`);
       html = html.replaceAll('Study Stark', 'AURA MAX');
       html = html.replaceAll('VidCloud', 'AURA MAX');
 
@@ -254,7 +287,8 @@ export default async function handler(req) {
       let text = await response.text();
       text = text.replaceAll('https://vidcloud.eu.org', currentDomain);
       text = text.replaceAll('vidcloud.eu.org', url.host);
-      text = text.replaceAll('https://bunny-cdn-qbg-s6.testwave.cc', currentDomain + '/cdn-proxy');
+      text = text.replaceAll(`https://${cdnHost}`, `${currentDomain}/cdn-proxy`);
+      text = text.replaceAll(cdnHost, `${url.host}/cdn-proxy`);
 
       return new Response(text, {
         status: response.status,
@@ -265,10 +299,12 @@ export default async function handler(req) {
       });
     }
 
-    // 5. Streaming Video/Media Streams Handling
-    const resHeaders = new Headers(response.headers);
+    // 5. Media & Stream Response Headers Pass-through
+    const resHeaders = new Headers();
+    ['content-type', 'content-length', 'content-range', 'accept-ranges'].forEach(h => {
+      if (response.headers.has(h)) resHeaders.set(h, response.headers.get(h));
+    });
     resHeaders.set('access-control-allow-origin', '*');
-    resHeaders.set('access-control-allow-methods', 'GET, POST, PUT, DELETE, OPTIONS');
 
     return new Response(response.body, {
       status: response.status,
