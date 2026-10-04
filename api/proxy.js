@@ -53,13 +53,6 @@ export default async function handler(req) {
           pointer-events: none !important;
         }
 
-        /* Hide Telegram and WhatsApp Action Buttons from top bar */
-        a[href*="telegram.me"],
-        a[href*="t.me"],
-        a[href*="whatsapp.com"] {
-          display: none !important;
-        }
-
         /* SR Popup Styles */
         .sr-overlay {
           position: fixed;
@@ -228,12 +221,8 @@ export default async function handler(req) {
       // Rebranding
       html = html.replaceAll('https://vidcloud.eu.org', currentDomain);
       html = html.replaceAll('vidcloud.eu.org', url.host);
-
-      // Name & Text Replacements
-      html = html.replace(/studystark/gi, 'AURA MAX');
       html = html.replaceAll('Study Stark', 'AURA MAX');
       html = html.replaceAll('VidCloud', 'AURA MAX');
-      html = html.replaceAll('Dev Aryan', '₋⁻–RATHOR');
 
       return new Response(html, {
         status: response.status,
@@ -249,8 +238,6 @@ export default async function handler(req) {
       let text = await response.text();
       text = text.replaceAll('https://vidcloud.eu.org', currentDomain);
       text = text.replaceAll('vidcloud.eu.org', url.host);
-      text = text.replace(/studystark/gi, 'AURA MAX');
-      text = text.replaceAll('Dev Aryan', '₋⁻–RATHOR');
 
       return new Response(text, {
         status: response.status,
@@ -275,4 +262,4 @@ export default async function handler(req) {
   } catch (error) {
     return new Response('Proxy Error: ' + error.message, { status: 500 });
   }
-}
+}  
