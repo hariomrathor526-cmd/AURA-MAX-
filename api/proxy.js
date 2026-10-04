@@ -1,7 +1,3 @@
-export const config = {
-  runtime: 'edge',
-};
-
 export default async function handler(req) {
   const url = new URL(req.url);
   const currentDomain = url.origin; 
@@ -51,13 +47,6 @@ export default async function handler(req) {
           visibility: hidden !important;
           opacity: 0 !important;
           pointer-events: none !important;
-        }
-
-        /* Hide ONLY Top Action Telegram and WhatsApp Buttons (Keep Popup Intact) */
-        .btn-top-action[href*="telegram.me"],
-        .btn-top-action[href*="t.me"],
-        .btn-top-action[href*="whatsapp.com"] {
-          display: none !important;
         }
 
         /* SR Popup Styles */
@@ -157,33 +146,7 @@ export default async function handler(req) {
           document.documentElement.style.setProperty('overflow', 'auto', 'important');
         }
 
-        // Client-side dynamic text replacement engine
-        function replaceDOMText() {
-          const walk = document.createTreeWalker(document.body || document.documentElement, NodeFilter.SHOW_TEXT, null, false);
-          let node;
-          while (node = walk.nextNode()) {
-            if (node.nodeValue) {
-              let updated = node.nodeValue;
-              updated = updated.replace(/Stark\\/PW Team/gi, 'AURA MAX');
-              updated = updated.replace(/Study Stark/gi, 'AURA MAX');
-              updated = updated.replace(/studystark/gi, 'AURA MAX');
-              updated = updated.replace(/Dev Aryan/gi, '₋⁻–RATHOR');
-              if (updated !== node.nodeValue) {
-                node.nodeValue = updated;
-              }
-            }
-          }
-        }
-
         document.addEventListener('DOMContentLoaded', function() {
-          replaceDOMText();
-
-          // Continuous DOM observer for dynamically rendered JS text
-          const observer = new MutationObserver(function() {
-            replaceDOMText();
-          });
-          observer.observe(document.body, { childList: true, subtree: true });
-
           // Cleanup old popups continuously
           setInterval(function() {
             var oldPopups = document.querySelectorAll('#join-tg-popup-container');
@@ -254,13 +217,8 @@ export default async function handler(req) {
       // Rebranding
       html = html.replaceAll('https://vidcloud.eu.org', currentDomain);
       html = html.replaceAll('vidcloud.eu.org', url.host);
-
-      // Name & Text Replacements (Server-side)
-      html = html.replaceAll('Stark/PW Team', 'AURA MAX');
-      html = html.replace(/studystark/gi, 'AURA MAX');
       html = html.replaceAll('Study Stark', 'AURA MAX');
       html = html.replaceAll('VidCloud', 'AURA MAX');
-      html = html.replaceAll('Dev Aryan', '₋⁻–RATHOR');
 
       return new Response(html, {
         status: response.status,
@@ -276,9 +234,6 @@ export default async function handler(req) {
       let text = await response.text();
       text = text.replaceAll('https://vidcloud.eu.org', currentDomain);
       text = text.replaceAll('vidcloud.eu.org', url.host);
-      text = text.replaceAll('Stark/PW Team', 'AURA MAX');
-      text = text.replace(/studystark/gi, 'AURA MAX');
-      text = text.replaceAll('Dev Aryan', '₋⁻–RATHOR');
 
       return new Response(text, {
         status: response.status,
@@ -303,4 +258,4 @@ export default async function handler(req) {
   } catch (error) {
     return new Response('Proxy Error: ' + error.message, { status: 500 });
   }
-}
+} 
