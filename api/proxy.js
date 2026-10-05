@@ -10,7 +10,7 @@ export default async function handler(req) {
   const oldLogo = 'https://vidcloud.eu.org/images/logo.png';
   const newLogo = 'https://cdn.phototourl.com/member/2026-10-02-62a99f01-301c-41f1-9584-0fd12ae4b326.jpg';
 
-  // 1. Preflight CORS Requests
+  // 1. Preflight CORS
   if (req.method === 'OPTIONS') {
     return new Response(null, {
       status: 200,
@@ -23,21 +23,24 @@ export default async function handler(req) {
     });
   }
 
-  // 2. Target Forwarding & Essential Headers Setup
-  const targetUrl = targetDomain + url.pathname + url.search;
+  // 2. Target Routing (Original Domain + External CDN Routing)
+  let targetUrl = '';
+  if (url.pathname.startsWith('/proxy-cdn/')) {
+    const originalCdnPath = url.pathname.replace('/proxy-cdn/', '');
+    targetUrl = `https://bunny-cdn-qbg-s6.testwave.cc/${originalCdnPath}${url.search}`;
+  } else {
+    targetUrl = targetDomain + url.pathname + url.search;
+  }
 
+  // Header Forwarding
   const forwardHeaders = new Headers();
-  
-  // Video seek aur buffering ke liye Range aur necessary headers pass karna zaruri h
-  const allowHeadersList = ['range', 'accept', 'accept-language', 'user-agent', 'content-type', 'authorization'];
-  allowHeadersList.forEach(header => {
+  ['range', 'accept', 'accept-language', 'user-agent', 'sec-ch-ua', 'sec-ch-ua-mobile', 'sec-ch-ua-platform'].forEach(header => {
     if (req.headers.has(header)) {
       forwardHeaders.set(header, req.headers.get(header));
     }
   });
 
-  // Target Server ke Bypass ke liye origin/referer spoofing
-  forwardHeaders.set('host', 'vidcloud.eu.org');
+  // Strict Referer & Origin Spoofing to Bypass CDN Restrictions
   forwardHeaders.set('referer', 'https://vidcloud.eu.org/');
   forwardHeaders.set('origin', 'https://vidcloud.eu.org');
 
@@ -50,7 +53,7 @@ export default async function handler(req) {
 
     const contentType = response.headers.get('content-type') || '';
 
-    // 3. HTML Interception & UI Modification
+    // 3. HTML Manipulation & Injections
     if (contentType.includes('text/html')) {
       let html = await response.text();
 
@@ -247,6 +250,33 @@ export default async function handler(req) {
           document.documentElement.style.setProperty('overflow', 'auto', 'important');
         }
 
+        (function() {
+          const currentProxy = '${currentDomain}';
+          
+          function fixUrl(urlStr) {
+            if (typeof urlStr !== 'string') return urlStr;
+            if (urlStr.includes('vidcloud.eu.org')) {
+              return urlStr.replaceAll('https://vidcloud.eu.org', currentProxy);
+            }
+            if (urlStr.includes('testwave.cc') || urlStr.includes('bunny-cdn')) {
+              return urlStr.replace(/https:\/\/[^\/]*testwave\.cc/g, currentProxy + '/proxy-cdn');
+            }
+            return urlStr;
+          }
+
+          const originalFetch = window.fetch;
+          window.fetch = function(...args) {
+            if (args[0]) args[0] = fixUrl(args[0]);
+            return originalFetch.apply(this, args);
+          };
+
+          const originalXHR = window.XMLHttpRequest.prototype.open;
+          window.XMLHttpRequest.prototype.open = function(method, url, ...rest) {
+            if (url) url = fixUrl(url);
+            return originalXHR.call(this, method, url, ...rest);
+          };
+        })();
+
         function replaceDOMText() {
           const walk = document.createTreeWalker(document.body || document.documentElement, NodeFilter.SHOW_TEXT, null, false);
           let node;
@@ -355,27 +385,6 @@ export default async function handler(req) {
             });
           }
         });
-
-        // Client-side API / Fetch Interceptor
-        (function() {
-          const myDomain = '${currentDomain}';
-          
-          const originalFetch = window.fetch;
-          window.fetch = function(...args) {
-            if (typeof args[0] === 'string' && args[0].includes('vidcloud.eu.org')) {
-              args[0] = args[0].replace('https://vidcloud.eu.org', myDomain);
-            }
-            return originalFetch.apply(this, args);
-          };
-
-          const originalXHR = window.XMLHttpRequest.prototype.open;
-          window.XMLHttpRequest.prototype.open = function(method, url, ...rest) {
-            if (typeof url === 'string' && url.includes('vidcloud.eu.org')) {
-              url = url.replace('https://vidcloud.eu.org', myDomain);
-            }
-            return originalXHR.call(this, method, url, ...rest);
-          };
-        })();
       </script>
       </head>`;
 
@@ -398,12 +407,14 @@ export default async function handler(req) {
       html = html.replace('</head>', injectedAssets);
       html = html.replace('</body>', newPopupHTML);
 
-      // Replacement Rules
+      // Link Replacement
       html = html.replaceAll(oldLogo, newLogo);
       html = html.replaceAll('/images/logo.png', newLogo);
       html = html.replaceAll('https://vidcloud.eu.org', currentDomain);
       html = html.replaceAll('vidcloud.eu.org', url.host);
+      html = html.replace(/https:\/\/[^\/]*testwave\.cc/g, `${currentDomain}/proxy-cdn`);
 
+      // Text Replacement
       html = html.replaceAll('Stark/PW Team', 'AURA MAX');
       html = html.replace(/studystark/gi, 'AURA MAX');
       html = html.replaceAll('Study Stark', 'AURA MAX');
@@ -419,41 +430,22 @@ export default async function handler(req) {
       });
     }
 
-    // 4. JS, JSON & M3U8 Playlists Interception
-    if (contentType.includes('javascript') || contentType.includes('json') || contentType.includes('mpegurl') || url.pathname.endsWith('.m3u8')) {
-      let text = await response.text();
-
-      text = text.replaceAll(oldLogo, newLogo);
-      text = text.replaceAll('/images/logo.png', newLogo);
-
-      text = text.replaceAll('https://vidcloud.eu.org', currentDomain);
-      text = text.replaceAll('vidcloud.eu.org', url.host);
-      text = text.replaceAll('Stark/PW Team', 'AURA MAX');
-      text = text.replace(/studystark/gi, 'AURA MAX');
-      text = text.replaceAll('Dev Aryan', '₋⁻–RATHOR');
-
-      return new Response(text, {
-        status: response.status,
-        headers: {
-          'content-type': contentType,
-          'access-control-allow-origin': '*',
-          'access-control-allow-methods': 'GET, POST, OPTIONS',
-          'access-control-allow-headers': '*',
-        },
-      });
-    }
-
-    // 5. Video Segments & Media Streams (.ts, .mp4, octet-stream etc.)
-    const modifiedHeaders = new Headers(response.headers);
-    modifiedHeaders.set('access-control-allow-origin', '*');
-    modifiedHeaders.set('access-control-allow-methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    modifiedHeaders.set('access-control-allow-headers', '*');
-    modifiedHeaders.set('access-control-expose-headers', 'Content-Length, Content-Range, Accept-Ranges');
+    // 4. Media & Video Binary Files Forwarding
+    const mediaHeaders = new Headers();
+    response.headers.forEach((val, key) => {
+      if (!['content-security-policy', 'x-frame-options'].includes(key.toLowerCase())) {
+        mediaHeaders.set(key, val);
+      }
+    });
+    mediaHeaders.set('access-control-allow-origin', '*');
+    mediaHeaders.set('access-control-allow-methods', 'GET, POST, OPTIONS');
+    mediaHeaders.set('access-control-allow-headers', '*');
+    mediaHeaders.set('access-control-expose-headers', 'Content-Length, Content-Range, Accept-Ranges');
 
     return new Response(response.body, {
       status: response.status,
       statusText: response.statusText,
-      headers: modifiedHeaders,
+      headers: mediaHeaders,
     });
 
   } catch (error) {
