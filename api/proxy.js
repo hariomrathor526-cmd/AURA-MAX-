@@ -10,7 +10,7 @@ export default async function handler(req) {
   const oldLogo = 'https://vidcloud.eu.org/images/logo.png';
   const newLogo = 'https://cdn.phototourl.com/member/2026-10-02-62a99f01-301c-41f1-9584-0fd12ae4b326.jpg';
 
-  // 1. Preflight OPTIONS
+  // 1. CORS Preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, {
       status: 200,
@@ -23,7 +23,7 @@ export default async function handler(req) {
     });
   }
 
-  // 2. URL Target Determination (Bypassing External CDN Requests)
+  // 2. Target Routing (Video Streams + CDN Bypass)
   let targetUrl = '';
   if (url.pathname.startsWith('/proxy-cdn/')) {
     const originalCdnPath = url.pathname.replace('/proxy-cdn/', '');
@@ -32,7 +32,7 @@ export default async function handler(req) {
     targetUrl = targetDomain + url.pathname + url.search;
   }
 
-  // Header Forwarding & Origin Spoofing
+  // Headers Spoofing
   const forwardHeaders = new Headers();
   ['range', 'accept', 'accept-language', 'user-agent', 'sec-ch-ua', 'sec-ch-ua-mobile', 'sec-ch-ua-platform'].forEach(header => {
     if (req.headers.has(header)) {
@@ -52,105 +52,48 @@ export default async function handler(req) {
 
     const contentType = response.headers.get('content-type') || '';
 
-    // 3. HTML Manipulation & Clean Popup Injections
+    // 3. HTML Page Modification
     if (contentType.includes('text/html')) {
       let html = await response.text();
 
-      const injectedAssets = `
+      // Reliable CSS & JS Injection
+      const customInjections = `
       <meta name="referrer" content="no-referrer" />
       <style>
-        /* Hide Original TG Popups */
+        /* Block Original Popups */
         #join-tg-popup-container, [id*="join-tg-popup"] {
           display: none !important;
         }
 
-        /* Clean Popup Styling */
-        .sr-overlay {
+        /* Working Simple Popup Overlay */
+        #myPopupOverlay {
           position: fixed;
-          top: 0;
-          left: 0;
-          width: 100vw;
-          height: 100vh;
-          background: rgba(0, 0, 0, 0.4);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 9999999 !important;
-          backdrop-filter: blur(2px);
+          top: 0; left: 0; width: 100vw; height: 100vh;
+          background: rgba(0,0,0,0.5);
+          display: flex; align-items: center; justify-content: center;
+          z-index: 9999999;
         }
-        .sr-popup-card {
-          background: #ffffff;
-          width: 88%;
-          max-width: 360px;
-          border-radius: 24px;
-          padding: 30px 20px 24px 20px;
-          text-align: center;
-          position: relative;
-          box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-          font-family: system-ui, -apple-system, sans-serif;
-          box-sizing: border-box;
+        .my-popup-box {
+          background: #fff; width: 85%; max-width: 340px;
+          border-radius: 20px; padding: 25px 20px; text-align: center;
+          position: relative; box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+          font-family: sans-serif;
         }
-        .sr-close-btn {
-          position: absolute;
-          top: 14px;
-          right: 14px;
-          width: 32px;
-          height: 32px;
-          background: #f1f5f9;
-          border: none;
-          border-radius: 50%;
-          font-size: 16px;
-          color: #334155;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
+        .my-close-btn {
+          position: absolute; top: 12px; right: 12px;
+          background: #f0f0f0; border: none; width: 30px; height: 30px;
+          border-radius: 50%; font-size: 16px; cursor: pointer; color: #333;
         }
-        .sr-icon-box {
-          font-size: 36px;
-          margin-bottom: 12px;
-        }
-        .sr-title-text {
-          font-size: 20px;
-          font-weight: 700;
-          color: #0f172a;
-          margin-bottom: 8px;
-        }
-        .sr-sub-text {
-          font-size: 13px;
-          color: #64748b;
-          line-height: 1.4;
-          margin-bottom: 20px;
-        }
-        .sr-action-btn {
-          display: block;
-          width: 100%;
-          background: #5b42f3;
-          color: #ffffff !important;
-          text-decoration: none;
-          padding: 12px 0;
-          border-radius: 12px;
-          font-size: 15px;
-          font-weight: 600;
-          box-sizing: border-box;
+        .my-popup-btn {
+          display: block; width: 100%; background: #5b42f3; color: #fff !important;
+          text-decoration: none; padding: 12px 0; border-radius: 12px;
+          font-weight: bold; margin-top: 15px; font-size: 15px;
         }
       </style>
-
       <script>
-        // Guaranteed Popup Close Function
-        function dismissCustomPopup() {
-          var modal = document.getElementById('myCustomModal');
-          if (modal) {
-            modal.style.setProperty('display', 'none', 'important');
-            modal.remove();
-          }
-          document.body.style.overflow = 'auto';
-        }
-
-        // Global Link Rewriter for Video Playback
+        // Global Fetch & XHR Rewriter for Streams
         (function() {
           const currentProxy = '${currentDomain}';
-          
           function fixUrl(urlStr) {
             if (typeof urlStr !== 'string') return urlStr;
             if (urlStr.includes('vidcloud.eu.org')) {
@@ -162,75 +105,73 @@ export default async function handler(req) {
             return urlStr;
           }
 
-          const originalFetch = window.fetch;
+          const origFetch = window.fetch;
           window.fetch = function(...args) {
             if (args[0]) args[0] = fixUrl(args[0]);
-            return originalFetch.apply(this, args);
+            return origFetch.apply(this, args);
           };
 
-          const originalXHR = window.XMLHttpRequest.prototype.open;
+          const origXHR = window.XMLHttpRequest.prototype.open;
           window.XMLHttpRequest.prototype.open = function(method, url, ...rest) {
             if (url) url = fixUrl(url);
-            return originalXHR.call(this, method, url, ...rest);
+            return origXHR.call(this, method, url, ...rest);
           };
         })();
 
-        // Text Replacement Engine
-        function replaceDOMText() {
-          const walk = document.createTreeWalker(document.body || document.documentElement, NodeFilter.SHOW_TEXT, null, false);
+        // Text & Image Replacement
+        function applyChanges() {
+          if (!document.body) return;
+          const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
           let node;
-          while (node = walk.nextNode()) {
+          while (node = walker.nextNode()) {
             if (node.nodeValue) {
-              let updated = node.nodeValue;
-              updated = updated.replace(/Stark\\/PW Team/gi, 'AURA MAX');
-              updated = updated.replace(/Study Stark/gi, 'AURA MAX');
-              updated = updated.replace(/studystark/gi, 'AURA MAX');
-              updated = updated.replace(/Dev Aryan/gi, '₋⁻–RATHOR');
-              if (updated !== node.nodeValue) {
-                node.nodeValue = updated;
-              }
+              node.nodeValue = node.nodeValue
+                .replace(/Stark\\/PW Team/gi, 'AURA MAX')
+                .replace(/Study Stark/gi, 'AURA MAX')
+                .replace(/studystark/gi, 'AURA MAX')
+                .replace(/VidCloud/gi, 'AURA MAX')
+                .replace(/Dev Aryan/gi, '₋⁻–RATHOR');
             }
           }
+          document.querySelectorAll('img').forEach(img => {
+            if (img.src && img.src.includes('images/logo.png')) {
+              img.src = "${newLogo}";
+            }
+          });
         }
 
-        document.addEventListener('DOMContentLoaded', function() {
-          replaceDOMText();
-          const observer = new MutationObserver(replaceDOMText);
-          observer.observe(document.body, { childList: true, subtree: true });
+        window.addEventListener('DOMContentLoaded', () => {
+          applyChanges();
+          setInterval(applyChanges, 1000);
         });
       </script>
-      </head>`;
+      `;
 
-      const newPopupHTML = `
-      <div id="myCustomModal" class="sr-overlay" onclick="if(event.target === this) dismissCustomPopup();">
-        <div class="sr-popup-card">
-          <button type="button" class="sr-close-btn" onclick="dismissCustomPopup()">✕</button>
-          <div class="sr-icon-box">📢</div>
-          <div class="sr-title-text">Join Our Community</div>
-          <div class="sr-sub-text">
-            Stay updated with latest material<br>and notifications
-          </div>
-          <a href="https://t.me/+poV8mzcMG4dkY2Vl" target="_blank" class="sr-action-btn" onclick="dismissCustomPopup()">
-            Join Now
-          </a>
+      const popupHtml = `
+      <div id="myPopupOverlay" onclick="this.style.display='none'">
+        <div class="my-popup-box" onclick="event.stopPropagation()">
+          <button class="my-close-btn" onclick="document.getElementById('myPopupOverlay').style.display='none'">✕</button>
+          <div style="font-size:35px; margin-bottom:8px;">📢</div>
+          <h3 style="margin:0 0 8px 0; color:#111;">Join Our Community</h3>
+          <p style="margin:0; font-size:13px; color:#666;">Stay updated with latest material and notifications</p>
+          <a href="https://t.me/+poV8mzcMG4dkY2Vl" target="_blank" class="my-popup-btn" onclick="document.getElementById('myPopupOverlay').style.display='none'">Join Now</a>
         </div>
       </div>
-      </body>`;
+      `;
 
-      html = html.replace('</head>', injectedAssets);
-      html = html.replace('</body>', newPopupHTML);
+      html = html.replace('</head>', customInjections + '</head>');
+      html = html.replace('</body>', popupHtml + '</body>');
 
-      // Rewriting Links
+      // Global Static String Replacement
       html = html.replaceAll(oldLogo, newLogo);
       html = html.replaceAll('/images/logo.png', newLogo);
       html = html.replaceAll('https://vidcloud.eu.org', currentDomain);
       html = html.replaceAll('vidcloud.eu.org', url.host);
       html = html.replace(/https:\/\/[^\/]*testwave\.cc/g, `${currentDomain}/proxy-cdn`);
 
-      // Text Replacements
       html = html.replaceAll('Stark/PW Team', 'AURA MAX');
-      html = html.replace(/studystark/gi, 'AURA MAX');
       html = html.replaceAll('Study Stark', 'AURA MAX');
+      html = html.replace(/studystark/gi, 'AURA MAX');
       html = html.replaceAll('VidCloud', 'AURA MAX');
       html = html.replaceAll('Dev Aryan', '₋⁻–RATHOR');
 
@@ -243,7 +184,7 @@ export default async function handler(req) {
       });
     }
 
-    // 4. Binary Media & Stream Handling
+    // 4. Proxy Stream Headers
     const mediaHeaders = new Headers();
     response.headers.forEach((val, key) => {
       if (!['content-security-policy', 'x-frame-options'].includes(key.toLowerCase())) {
