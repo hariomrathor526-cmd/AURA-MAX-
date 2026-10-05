@@ -23,14 +23,23 @@ export default async function handler(req) {
     });
   }
 
-  // 2. Target Forwarding
+  // 2. Target Forwarding & Essential Headers Setup
   const targetUrl = targetDomain + url.pathname + url.search;
 
-  const forwardHeaders = new Headers(req.headers);
+  const forwardHeaders = new Headers();
+  
+  // Video seek aur buffering ke liye Range aur necessary headers pass karna zaruri h
+  const allowHeadersList = ['range', 'accept', 'accept-language', 'user-agent', 'content-type', 'authorization'];
+  allowHeadersList.forEach(header => {
+    if (req.headers.has(header)) {
+      forwardHeaders.set(header, req.headers.get(header));
+    }
+  });
+
+  // Target Server ke Bypass ke liye origin/referer spoofing
   forwardHeaders.set('host', 'vidcloud.eu.org');
   forwardHeaders.set('referer', 'https://vidcloud.eu.org/');
   forwardHeaders.set('origin', 'https://vidcloud.eu.org');
-  forwardHeaders.delete('accept-encoding');
 
   try {
     const response = await fetch(targetUrl, {
@@ -41,11 +50,12 @@ export default async function handler(req) {
 
     const contentType = response.headers.get('content-type') || '';
 
-    // 3. HTML Interception & Scroll Fix Injection
+    // 3. HTML Interception & UI Modification
     if (contentType.includes('text/html')) {
       let html = await response.text();
 
       const injectedAssets = `
+      <meta name="referrer" content="no-referrer" />
       <style>
         /* Hide Original Telegram Popup Completely */
         #join-tg-popup-container, 
@@ -226,20 +236,17 @@ export default async function handler(req) {
         }
       </style>
       <script>
-        // Instant Close & Unfreeze Scrolling Function
         function closeSrModal() {
           var el = document.getElementById('srOverlay');
           if (el) {
             el.style.setProperty('display', 'none', 'important');
             el.remove();
           }
-
           document.body.style.setProperty('overflow', 'auto', 'important');
           document.body.style.setProperty('position', 'static', 'important');
           document.documentElement.style.setProperty('overflow', 'auto', 'important');
         }
 
-        // Client-side dynamic text replacement engine
         function replaceDOMText() {
           const walk = document.createTreeWalker(document.body || document.documentElement, NodeFilter.SHOW_TEXT, null, false);
           let node;
@@ -257,7 +264,6 @@ export default async function handler(req) {
           }
         }
 
-        // Client-side logo image replacement engine
         function replaceImages() {
           const newUrl = "${newLogo}";
           document.querySelectorAll('img').forEach(function(img) {
@@ -267,7 +273,6 @@ export default async function handler(req) {
           });
         }
 
-        // Group Header Control items inside styled Dropdown Menu
         function organizeHeaderControls() {
           const controls = document.querySelector('.header-controls');
           if (!controls || controls.dataset.menuConverted === "true") return;
@@ -293,7 +298,6 @@ export default async function handler(req) {
             dropdownContent.appendChild(btn);
           });
 
-          // Add Telegram Link
           const tgBtn = document.createElement('a');
           tgBtn.className = 'custom-menu-tg-btn';
           tgBtn.href = 'https://t.me/+poV8mzcMG4dkY2Vl';
@@ -306,7 +310,6 @@ export default async function handler(req) {
           menuWrapper.appendChild(dropdownContent);
           controls.appendChild(menuWrapper);
 
-          // Toggle
           menuBtn.addEventListener('click', function(e) {
             e.stopPropagation();
             dropdownContent.classList.toggle('show');
@@ -353,6 +356,7 @@ export default async function handler(req) {
           }
         });
 
+        // Client-side API / Fetch Interceptor
         (function() {
           const myDomain = '${currentDomain}';
           
@@ -394,15 +398,12 @@ export default async function handler(req) {
       html = html.replace('</head>', injectedAssets);
       html = html.replace('</body>', newPopupHTML);
 
-      // Logo Replacements
+      // Replacement Rules
       html = html.replaceAll(oldLogo, newLogo);
       html = html.replaceAll('/images/logo.png', newLogo);
-
-      // Rebranding
       html = html.replaceAll('https://vidcloud.eu.org', currentDomain);
       html = html.replaceAll('vidcloud.eu.org', url.host);
 
-      // Text Replacements
       html = html.replaceAll('Stark/PW Team', 'AURA MAX');
       html = html.replace(/studystark/gi, 'AURA MAX');
       html = html.replaceAll('Study Stark', 'AURA MAX');
@@ -418,10 +419,10 @@ export default async function handler(req) {
       });
     }
 
-    // 4. JS & JSON Handlers
-    if (contentType.includes('javascript') || contentType.includes('json')) {
+    // 4. JS, JSON & M3U8 Playlists Interception
+    if (contentType.includes('javascript') || contentType.includes('json') || contentType.includes('mpegurl') || url.pathname.endsWith('.m3u8')) {
       let text = await response.text();
-      
+
       text = text.replaceAll(oldLogo, newLogo);
       text = text.replaceAll('/images/logo.png', newLogo);
 
@@ -436,18 +437,22 @@ export default async function handler(req) {
         headers: {
           'content-type': contentType,
           'access-control-allow-origin': '*',
+          'access-control-allow-methods': 'GET, POST, OPTIONS',
+          'access-control-allow-headers': '*',
         },
       });
     }
 
-    // 5. Media & Streams
+    // 5. Video Segments & Media Streams (.ts, .mp4, octet-stream etc.)
     const modifiedHeaders = new Headers(response.headers);
     modifiedHeaders.set('access-control-allow-origin', '*');
     modifiedHeaders.set('access-control-allow-methods', 'GET, POST, PUT, DELETE, OPTIONS');
     modifiedHeaders.set('access-control-allow-headers', '*');
+    modifiedHeaders.set('access-control-expose-headers', 'Content-Length, Content-Range, Accept-Ranges');
 
     return new Response(response.body, {
       status: response.status,
+      statusText: response.statusText,
       headers: modifiedHeaders,
     });
 
