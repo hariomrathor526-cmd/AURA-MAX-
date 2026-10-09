@@ -40,18 +40,15 @@ export default async function handler(req) {
       redirect: 'manual',
     });
 
-    // Clean Headers (Remove Security Blocks preventing Test/iFrames from loading)
     const responseHeaders = new Headers(response.headers);
     responseHeaders.set('Access-Control-Allow-Origin', '*');
     responseHeaders.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     responseHeaders.set('Access-Control-Allow-Headers', '*');
     
-    // Remove headers that force about:blank or block framing
     responseHeaders.delete('x-frame-options');
     responseHeaders.delete('content-security-policy');
     responseHeaders.delete('content-security-policy-report-only');
 
-    // Handle Backend Redirects
     if ([301, 302, 303, 307, 308].includes(response.status)) {
       const location = responseHeaders.get('location');
       if (location) {
@@ -72,7 +69,6 @@ export default async function handler(req) {
 
       const injectedAssets = `
       <style>
-        /* Hide Original Telegram Popup Completely */
         #join-tg-popup-container, 
         [id*="join-tg-popup"] {
           display: none !important;
@@ -81,7 +77,6 @@ export default async function handler(req) {
           pointer-events: none !important;
         }
 
-        /* Hide Top Action Buttons */
         .btn-top-action[href*="telegram.me"],
         .btn-top-action[href*="t.me"],
         .btn-top-action[href*="whatsapp.com"] {
@@ -167,7 +162,6 @@ export default async function handler(req) {
           background: #0077b5;
         }
 
-        /* SR Popup Styles */
         .sr-overlay {
           position: fixed;
           top: 0;
@@ -254,27 +248,24 @@ export default async function handler(req) {
           const myDomain = '${currentDomain}';
           const targetDomain = 'https://vidcloud.eu.org';
 
-          // Override window.open to force opening in current window instead of blank page
-          window.open = function(url) {
-            if (url) {
+          // Prevent about:blank Popup Creation & Redirect inside Same Window
+          const originalOpen = window.open;
+          window.open = function(url, target, features) {
+            if (!url || url === 'about:blank') {
+              // Return current window context so document.write targets current page
+              return window;
+            }
+            if (typeof url === 'string') {
               if (url.includes('vidcloud.eu.org')) {
                 url = url.replace(targetDomain, myDomain);
               } else if (url.startsWith('/')) {
                 url = myDomain + url;
               }
               window.location.href = url;
+              return window;
             }
-            return window;
+            return originalOpen.apply(this, arguments);
           };
-
-          // Fix IFrames dynamically
-          function fixIframes() {
-            document.querySelectorAll('iframe').forEach(function(iframe) {
-              if (iframe.src && iframe.src.includes('vidcloud.eu.org')) {
-                iframe.src = iframe.src.replace(targetDomain, myDomain);
-              }
-            });
-          }
 
           // Override Fetch
           const originalFetch = window.fetch;
@@ -297,13 +288,6 @@ export default async function handler(req) {
             }
             return originalXHR.call(this, method, url, ...rest);
           };
-
-          // Observe DOM for newly inserted Test IFrames
-          document.addEventListener('DOMContentLoaded', function() {
-            fixIframes();
-            const observer = new MutationObserver(fixIframes);
-            observer.observe(document.body || document.documentElement, { childList: true, subtree: true });
-          });
         })();
 
         function closeSrModal() {
@@ -373,7 +357,7 @@ export default async function handler(req) {
           tgBtn.className = 'custom-menu-tg-btn';
           tgBtn.href = 'https://t.me/+poV8mzcMG4dkY2Vl';
           tgBtn.target = '_blank';
-          tgBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.121l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.458c.538-.196 1.006.128.832.941z"/></svg> <span>Join Telegram</span>';
+          tgBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373-12-12-5.373-12-12-12zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.121l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.458c.538-.196 1.006.128.832.941z"/></svg> <span>Join Telegram</span>';
           
           dropdownContent.appendChild(tgBtn);
 
@@ -465,7 +449,7 @@ export default async function handler(req) {
       });
     }
 
-    // 4. JS & JSON Handlers
+    // 4. JS & JSON Handlers (Strictly avoid breaking JS code)
     if (contentType.includes('javascript') || contentType.includes('json')) {
       let text = await response.text();
       
@@ -479,7 +463,7 @@ export default async function handler(req) {
       });
     }
 
-    // 5. Media & Streams
+    // 5. Other Resources
     return new Response(response.body, {
       status: response.status,
       headers: responseHeaders,
