@@ -37,25 +37,34 @@ export default async function handler(req) {
       method: req.method,
       headers: forwardHeaders,
       body: req.method !== 'GET' && req.method !== 'HEAD' ? req.body : null,
-      redirect: 'manual', // Manual handling to prevent raw target domain leaks on redirect
+      redirect: 'manual',
     });
+
+    // Clean Headers (Remove Security Blocks preventing Test/iFrames from loading)
+    const responseHeaders = new Headers(response.headers);
+    responseHeaders.set('Access-Control-Allow-Origin', '*');
+    responseHeaders.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    responseHeaders.set('Access-Control-Allow-Headers', '*');
+    
+    // Remove headers that force about:blank or block framing
+    responseHeaders.delete('x-frame-options');
+    responseHeaders.delete('content-security-policy');
+    responseHeaders.delete('content-security-policy-report-only');
 
     // Handle Backend Redirects
     if ([301, 302, 303, 307, 308].includes(response.status)) {
-      const location = response.headers.get('location');
+      const location = responseHeaders.get('location');
       if (location) {
         const newLocation = location.replace(targetDomain, currentDomain);
+        responseHeaders.set('location', newLocation);
         return new Response(null, {
           status: response.status,
-          headers: {
-            'location': newLocation,
-            'Access-Control-Allow-Origin': '*',
-          },
+          headers: responseHeaders,
         });
       }
     }
 
-    const contentType = response.headers.get('content-type') || '';
+    const contentType = responseHeaders.get('content-type') || '';
 
     // 3. HTML Interception
     if (contentType.includes('text/html')) {
@@ -72,14 +81,13 @@ export default async function handler(req) {
           pointer-events: none !important;
         }
 
-        /* Hide ONLY Top Action Telegram and WhatsApp Buttons */
+        /* Hide Top Action Buttons */
         .btn-top-action[href*="telegram.me"],
         .btn-top-action[href*="t.me"],
         .btn-top-action[href*="whatsapp.com"] {
           display: none !important;
         }
 
-        /* Matches Site Theme UI */
         .custom-menu-wrapper {
           position: relative;
           display: inline-block;
@@ -246,19 +254,29 @@ export default async function handler(req) {
           const myDomain = '${currentDomain}';
           const targetDomain = 'https://vidcloud.eu.org';
 
-          // Override window.open completely
-          window.open = function(url, name, specs) {
-            if (typeof url === 'string') {
+          // Override window.open to force opening in current window instead of blank page
+          window.open = function(url) {
+            if (url) {
               if (url.includes('vidcloud.eu.org')) {
                 url = url.replace(targetDomain, myDomain);
               } else if (url.startsWith('/')) {
                 url = myDomain + url;
               }
+              window.location.href = url;
             }
-            return window.location.assign(url || myDomain);
+            return window;
           };
 
-          // Override fetch
+          // Fix IFrames dynamically
+          function fixIframes() {
+            document.querySelectorAll('iframe').forEach(function(iframe) {
+              if (iframe.src && iframe.src.includes('vidcloud.eu.org')) {
+                iframe.src = iframe.src.replace(targetDomain, myDomain);
+              }
+            });
+          }
+
+          // Override Fetch
           const originalFetch = window.fetch;
           window.fetch = function(input, init) {
             if (typeof input === 'string') {
@@ -271,7 +289,7 @@ export default async function handler(req) {
             return originalFetch.call(this, input, init);
           };
 
-          // Override XMLHttpRequest
+          // Override XHR
           const originalXHR = window.XMLHttpRequest.prototype.open;
           window.XMLHttpRequest.prototype.open = function(method, url, ...rest) {
             if (typeof url === 'string' && url.includes('vidcloud.eu.org')) {
@@ -280,15 +298,12 @@ export default async function handler(req) {
             return originalXHR.call(this, method, url, ...rest);
           };
 
-          // Intercept link clicks globally
-          document.addEventListener('click', function(e) {
-            const anchor = e.target.closest('a');
-            if (anchor && anchor.href) {
-              if (anchor.href.includes('vidcloud.eu.org')) {
-                anchor.href = anchor.href.replace(targetDomain, myDomain);
-              }
-            }
-          }, true);
+          // Observe DOM for newly inserted Test IFrames
+          document.addEventListener('DOMContentLoaded', function() {
+            fixIframes();
+            const observer = new MutationObserver(fixIframes);
+            observer.observe(document.body || document.documentElement, { childList: true, subtree: true });
+          });
         })();
 
         function closeSrModal() {
@@ -446,10 +461,7 @@ export default async function handler(req) {
 
       return new Response(html, {
         status: response.status,
-        headers: {
-          'content-type': 'text/html; charset=utf-8',
-          'access-control-allow-origin': '*',
-        },
+        headers: responseHeaders,
       });
     }
 
@@ -463,22 +475,14 @@ export default async function handler(req) {
 
       return new Response(text, {
         status: response.status,
-        headers: {
-          'content-type': contentType,
-          'access-control-allow-origin': '*',
-        },
+        headers: responseHeaders,
       });
     }
 
     // 5. Media & Streams
-    const modifiedHeaders = new Headers(response.headers);
-    modifiedHeaders.set('access-control-allow-origin', '*');
-    modifiedHeaders.set('access-control-allow-methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    modifiedHeaders.set('access-control-allow-headers', '*');
-
     return new Response(response.body, {
       status: response.status,
-      headers: modifiedHeaders,
+      headers: responseHeaders,
     });
 
   } catch (error) {
