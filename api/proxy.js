@@ -23,21 +23,34 @@ export default async function handler(req) {
     });
   }
 
-  // 2. Target Forwarding
+  // 2. Target Forwarding (FIXED FOR 403 ERROR)
   const targetUrl = targetDomain + url.pathname + url.search;
 
-  const forwardHeaders = new Headers(req.headers);
+  // Real Browser Headers Imitation
+  const forwardHeaders = new Headers();
   forwardHeaders.set('host', 'vidcloud.eu.org');
   forwardHeaders.set('referer', 'https://vidcloud.eu.org/');
   forwardHeaders.set('origin', 'https://vidcloud.eu.org');
-  forwardHeaders.delete('accept-encoding');
+  forwardHeaders.set('user-agent', req.headers.get('user-agent') || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+  forwardHeaders.set('accept', req.headers.get('accept') || 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8');
+  forwardHeaders.set('accept-language', 'en-US,en;q=0.9');
+  
+  if (req.headers.get('cookie')) {
+    forwardHeaders.set('cookie', req.headers.get('cookie'));
+  }
 
   try {
     const response = await fetch(targetUrl, {
       method: req.method,
       headers: forwardHeaders,
       body: req.method !== 'GET' && req.method !== 'HEAD' ? req.body : null,
+      redirect: 'follow',
     });
+
+    // Agar abhi bhi 403 aaye toh server response forward kar dega
+    if (response.status === 403) {
+      console.log("Target server responded with 403 Forbidden");
+    }
 
     const contentType = response.headers.get('content-type') || '';
 
@@ -226,7 +239,6 @@ export default async function handler(req) {
         }
       </style>
       <script>
-        // Instant Close & Unfreeze Scrolling Function
         function closeSrModal() {
           var el = document.getElementById('srOverlay');
           if (el) {
@@ -239,14 +251,13 @@ export default async function handler(req) {
           document.documentElement.style.setProperty('overflow', 'auto', 'important');
         }
 
-        // Client-side dynamic text replacement engine
         function replaceDOMText() {
           const walk = document.createTreeWalker(document.body || document.documentElement, NodeFilter.SHOW_TEXT, null, false);
           let node;
           while (node = walk.nextNode()) {
             if (node.nodeValue) {
               let updated = node.nodeValue;
-              updated = updated.replace(/Stark\\/PW Team/gi, 'AURA MAX');
+              updated = updated.replace(/Stark\\\\/PW Team/gi, 'AURA MAX');
               updated = updated.replace(/Study Stark/gi, 'AURA MAX');
               updated = updated.replace(/studystark/gi, 'AURA MAX');
               updated = updated.replace(/Dev Aryan/gi, '₋⁻–RATHOR');
@@ -257,7 +268,6 @@ export default async function handler(req) {
           }
         }
 
-        // Client-side logo image replacement engine
         function replaceImages() {
           const newUrl = "${newLogo}";
           document.querySelectorAll('img').forEach(function(img) {
@@ -267,7 +277,6 @@ export default async function handler(req) {
           });
         }
 
-        // Group Header Control items inside styled Dropdown Menu
         function organizeHeaderControls() {
           const controls = document.querySelector('.header-controls');
           if (!controls || controls.dataset.menuConverted === "true") return;
@@ -293,12 +302,11 @@ export default async function handler(req) {
             dropdownContent.appendChild(btn);
           });
 
-          // Add Telegram Link
           const tgBtn = document.createElement('a');
           tgBtn.className = 'custom-menu-tg-btn';
           tgBtn.href = 'https://t.me/+poV8mzcMG4dkY2Vl';
           tgBtn.target = '_blank';
-          tgBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.121l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.458c.538-.196 1.006.128.832.941z"/></svg> <span>Join Telegram</span>';
+          tgBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-12zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.121l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.458c.538-.196 1.006.128.832.941z"/></svg> <span>Join Telegram</span>';
           
           dropdownContent.appendChild(tgBtn);
 
@@ -306,7 +314,6 @@ export default async function handler(req) {
           menuWrapper.appendChild(dropdownContent);
           controls.appendChild(menuWrapper);
 
-          // Toggle
           menuBtn.addEventListener('click', function(e) {
             e.stopPropagation();
             dropdownContent.classList.toggle('show');
@@ -394,15 +401,12 @@ export default async function handler(req) {
       html = html.replace('</head>', injectedAssets);
       html = html.replace('</body>', newPopupHTML);
 
-      // Logo Replacements
       html = html.replaceAll(oldLogo, newLogo);
       html = html.replaceAll('/images/logo.png', newLogo);
 
-      // Rebranding
       html = html.replaceAll('https://vidcloud.eu.org', currentDomain);
       html = html.replaceAll('vidcloud.eu.org', url.host);
 
-      // Text Replacements
       html = html.replaceAll('Stark/PW Team', 'AURA MAX');
       html = html.replace(/studystark/gi, 'AURA MAX');
       html = html.replaceAll('Study Stark', 'AURA MAX');
