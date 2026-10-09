@@ -23,10 +23,9 @@ export default async function handler(req) {
     });
   }
 
-  // 2. Target Forwarding (FIXED FOR 403 ERROR)
+  // 2. Target Forwarding (Fixed for 403 Forbidden)
   const targetUrl = targetDomain + url.pathname + url.search;
 
-  // Real Browser Headers Imitation
   const forwardHeaders = new Headers();
   forwardHeaders.set('host', 'vidcloud.eu.org');
   forwardHeaders.set('referer', 'https://vidcloud.eu.org/');
@@ -46,11 +45,6 @@ export default async function handler(req) {
       body: req.method !== 'GET' && req.method !== 'HEAD' ? req.body : null,
       redirect: 'follow',
     });
-
-    // Agar abhi bhi 403 aaye toh server response forward kar dega
-    if (response.status === 403) {
-      console.log("Target server responded with 403 Forbidden");
-    }
 
     const contentType = response.headers.get('content-type') || '';
 
@@ -170,6 +164,15 @@ export default async function handler(req) {
           z-index: 9999999 !important;
           backdrop-filter: blur(2px);
         }
+
+        .sr-overlay.sr-force-hide {
+          display: none !important;
+          visibility: hidden !important;
+          opacity: 0 !important;
+          pointer-events: none !important;
+          z-index: -9999 !important;
+        }
+
         #srPopup {
           background: #ffffff;
           width: 88%;
@@ -239,18 +242,48 @@ export default async function handler(req) {
         }
       </style>
       <script>
-        function closeSrModal() {
-          var el = document.getElementById('srOverlay');
-          if (el) {
-            el.style.setProperty('display', 'none', 'important');
-            el.remove();
+        // Instant Close & Unfreeze Scrolling Function
+        function closeSrModal(e) {
+          if (e) {
+            e.preventDefault();
+            e.stopPropagation();
           }
+
+          var overlays = document.querySelectorAll('#srOverlay, .sr-overlay');
+          overlays.forEach(function(el) {
+            el.classList.add('sr-force-hide');
+            el.style.setProperty('display', 'none', 'important');
+            if (el.parentNode) {
+              el.parentNode.removeChild(el);
+            }
+          });
+
+          document.body.classList.remove('modal-open', 'no-scroll', 'overflow-hidden');
+          document.documentElement.classList.remove('modal-open', 'no-scroll', 'overflow-hidden');
 
           document.body.style.setProperty('overflow', 'auto', 'important');
           document.body.style.setProperty('position', 'static', 'important');
+          document.body.style.setProperty('height', 'auto', 'important');
+
           document.documentElement.style.setProperty('overflow', 'auto', 'important');
+          document.documentElement.style.setProperty('position', 'static', 'important');
+          document.documentElement.style.setProperty('height', 'auto', 'important');
         }
 
+        // Capture phase listeners for reliable close
+        document.addEventListener('click', function(e) {
+          if (e.target && (e.target.id === 'srClose' || e.target.id === 'srBtn' || e.target.id === 'srOverlay')) {
+            closeSrModal(e);
+          }
+        }, true);
+
+        document.addEventListener('touchstart', function(e) {
+          if (e.target && (e.target.id === 'srClose' || e.target.id === 'srBtn')) {
+            closeSrModal(e);
+          }
+        }, { passive: false });
+
+        // Client-side dynamic text replacement engine
         function replaceDOMText() {
           const walk = document.createTreeWalker(document.body || document.documentElement, NodeFilter.SHOW_TEXT, null, false);
           let node;
@@ -268,6 +301,7 @@ export default async function handler(req) {
           }
         }
 
+        // Client-side logo image replacement engine
         function replaceImages() {
           const newUrl = "${newLogo}";
           document.querySelectorAll('img').forEach(function(img) {
@@ -277,6 +311,7 @@ export default async function handler(req) {
           });
         }
 
+        // Group Header Control items inside styled Dropdown Menu
         function organizeHeaderControls() {
           const controls = document.querySelector('.header-controls');
           if (!controls || controls.dataset.menuConverted === "true") return;
@@ -302,6 +337,7 @@ export default async function handler(req) {
             dropdownContent.appendChild(btn);
           });
 
+          // Add Telegram Link
           const tgBtn = document.createElement('a');
           tgBtn.className = 'custom-menu-tg-btn';
           tgBtn.href = 'https://t.me/+poV8mzcMG4dkY2Vl';
@@ -314,6 +350,7 @@ export default async function handler(req) {
           menuWrapper.appendChild(dropdownContent);
           controls.appendChild(menuWrapper);
 
+          // Toggle
           menuBtn.addEventListener('click', function(e) {
             e.stopPropagation();
             dropdownContent.classList.toggle('show');
@@ -342,22 +379,6 @@ export default async function handler(req) {
             var oldPopups = document.querySelectorAll('#join-tg-popup-container');
             oldPopups.forEach(function(item) { item.remove(); });
           }, 400);
-
-          var closeBtn = document.getElementById('srClose');
-          var overlay = document.getElementById('srOverlay');
-
-          if (closeBtn) {
-            closeBtn.addEventListener('click', closeSrModal);
-            closeBtn.addEventListener('touchstart', closeSrModal);
-          }
-
-          if (overlay) {
-            overlay.addEventListener('click', function(e) {
-              if (e.target === overlay) {
-                closeSrModal();
-              }
-            });
-          }
         });
 
         (function() {
@@ -383,15 +404,15 @@ export default async function handler(req) {
       </head>`;
 
       const newPopupHTML = `
-      <div id="srOverlay" class="sr-overlay">
+      <div id="srOverlay" class="sr-overlay" onclick="if(event.target === this) closeSrModal(event)">
         <div id="srPopup">
-          <div id="srClose" onclick="closeSrModal()" ontouchstart="closeSrModal()">✕</div>
+          <button type="button" id="srClose" onclick="closeSrModal(event)">✕</button>
           <div id="srIcon">📢</div>
           <div id="srTitle">Join Our Community</div>
           <div id="srSub">
             Stay updated with latest material<br>and notifications
           </div>
-          <a href="https://t.me/+poV8mzcMG4dkY2Vl" target="_blank" id="srBtn" onclick="closeSrModal()">
+          <a href="https://t.me/+poV8mzcMG4dkY2Vl" target="_blank" id="srBtn" onclick="closeSrModal(event)">
             Join Now
           </a>
         </div>
@@ -401,12 +422,15 @@ export default async function handler(req) {
       html = html.replace('</head>', injectedAssets);
       html = html.replace('</body>', newPopupHTML);
 
+      // Logo Replacements
       html = html.replaceAll(oldLogo, newLogo);
       html = html.replaceAll('/images/logo.png', newLogo);
 
+      // Rebranding
       html = html.replaceAll('https://vidcloud.eu.org', currentDomain);
       html = html.replaceAll('vidcloud.eu.org', url.host);
 
+      // Text Replacements
       html = html.replaceAll('Stark/PW Team', 'AURA MAX');
       html = html.replace(/studystark/gi, 'AURA MAX');
       html = html.replaceAll('Study Stark', 'AURA MAX');
