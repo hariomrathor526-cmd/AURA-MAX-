@@ -15,10 +15,10 @@ export default async function handler(req) {
     return new Response(null, {
       status: 200,
       headers: {
-        'access-control-allow-origin': '*',
-        'access-control-allow-methods': 'GET, POST, PUT, DELETE, OPTIONS',
-        'access-control-allow-headers': '*',
-        'access-control-max-age': '86400',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': '*',
+        'Access-Control-Max-Age': '86400',
       },
     });
   }
@@ -37,6 +37,7 @@ export default async function handler(req) {
       method: req.method,
       headers: forwardHeaders,
       body: req.method !== 'GET' && req.method !== 'HEAD' ? req.body : null,
+      redirect: 'follow',
     });
 
     const contentType = response.headers.get('content-type') || '';
@@ -226,6 +227,39 @@ export default async function handler(req) {
         }
       </style>
       <script>
+        // Global Fetch & Window Proxy Interception (Fixes blank window / test redirection)
+        (function() {
+          const myDomain = '${currentDomain}';
+          const targetDomain = 'https://vidcloud.eu.org';
+
+          // Override window.open to keep windows within proxy
+          const origOpen = window.open;
+          window.open = function(url, target, features) {
+            if (typeof url === 'string' && url.includes('vidcloud.eu.org')) {
+              url = url.replace(targetDomain, myDomain);
+            }
+            return origOpen.call(this, url, target, features);
+          };
+
+          // Override Fetch
+          const originalFetch = window.fetch;
+          window.fetch = function(...args) {
+            if (typeof args[0] === 'string' && args[0].includes('vidcloud.eu.org')) {
+              args[0] = args[0].replace(targetDomain, myDomain);
+            }
+            return originalFetch.apply(this, args);
+          };
+
+          // Override XHR
+          const originalXHR = window.XMLHttpRequest.prototype.open;
+          window.XMLHttpRequest.prototype.open = function(method, url, ...rest) {
+            if (typeof url === 'string' && url.includes('vidcloud.eu.org')) {
+              url = url.replace(targetDomain, myDomain);
+            }
+            return originalXHR.call(this, method, url, ...rest);
+          };
+        })();
+
         // Instant Close & Unfreeze Scrolling Function
         function closeSrModal() {
           var el = document.getElementById('srOverlay');
@@ -352,28 +386,7 @@ export default async function handler(req) {
             });
           }
         });
-
-        (function() {
-          const myDomain = '${currentDomain}';
-          
-          const originalFetch = window.fetch;
-          window.fetch = function(...args) {
-            if (typeof args[0] === 'string' && args[0].includes('vidcloud.eu.org')) {
-              args[0] = args[0].replace('https://vidcloud.eu.org', myDomain);
-            }
-            return originalFetch.apply(this, args);
-          };
-
-          const originalXHR = window.XMLHttpRequest.prototype.open;
-          window.XMLHttpRequest.prototype.open = function(method, url, ...rest) {
-            if (typeof url === 'string' && url.includes('vidcloud.eu.org')) {
-              url = url.replace('https://vidcloud.eu.org', myDomain);
-            }
-            return originalXHR.call(this, method, url, ...rest);
-          };
-        })();
-      </script>
-      </head>`;
+      </script>`;
 
       const newPopupHTML = `
       <div id="srOverlay" class="sr-overlay">
@@ -388,26 +401,25 @@ export default async function handler(req) {
             Join Now
           </a>
         </div>
-      </div>
-      </body>`;
+      </div>`;
 
-      html = html.replace('</head>', injectedAssets);
-      html = html.replace('</body>', newPopupHTML);
+      // Inject Assets safely
+      if (html.includes('</head>')) {
+        html = html.replace('</head>', `${injectedAssets}</head>`);
+      } else {
+        html = injectedAssets + html;
+      }
 
-      // Logo Replacements
+      if (html.includes('</body>')) {
+        html = html.replace('</body>', `${newPopupHTML}</body>`);
+      } else {
+        html = html + newPopupHTML;
+      }
+
+      // Safe String Replacements
       html = html.replaceAll(oldLogo, newLogo);
       html = html.replaceAll('/images/logo.png', newLogo);
-
-      // Rebranding
       html = html.replaceAll('https://vidcloud.eu.org', currentDomain);
-      html = html.replaceAll('vidcloud.eu.org', url.host);
-
-      // Text Replacements
-      html = html.replaceAll('Stark/PW Team', 'AURA MAX');
-      html = html.replace(/studystark/gi, 'AURA MAX');
-      html = html.replaceAll('Study Stark', 'AURA MAX');
-      html = html.replaceAll('VidCloud', 'AURA MAX');
-      html = html.replaceAll('Dev Aryan', '₋⁻–RATHOR');
 
       return new Response(html, {
         status: response.status,
@@ -418,18 +430,13 @@ export default async function handler(req) {
       });
     }
 
-    // 4. JS & JSON Handlers
+    // 4. JS & JSON Handlers (Avoid replacing raw domain in JS to prevent code breaking)
     if (contentType.includes('javascript') || contentType.includes('json')) {
       let text = await response.text();
       
       text = text.replaceAll(oldLogo, newLogo);
       text = text.replaceAll('/images/logo.png', newLogo);
-
       text = text.replaceAll('https://vidcloud.eu.org', currentDomain);
-      text = text.replaceAll('vidcloud.eu.org', url.host);
-      text = text.replaceAll('Stark/PW Team', 'AURA MAX');
-      text = text.replace(/studystark/gi, 'AURA MAX');
-      text = text.replaceAll('Dev Aryan', '₋⁻–RATHOR');
 
       return new Response(text, {
         status: response.status,
