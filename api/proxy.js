@@ -23,27 +23,20 @@ export default async function handler(req) {
     });
   }
 
-  // 2. Target Forwarding (Fixed for 403 Forbidden)
+  // 2. Target Forwarding
   const targetUrl = targetDomain + url.pathname + url.search;
 
-  const forwardHeaders = new Headers();
+  const forwardHeaders = new Headers(req.headers);
   forwardHeaders.set('host', 'vidcloud.eu.org');
   forwardHeaders.set('referer', 'https://vidcloud.eu.org/');
   forwardHeaders.set('origin', 'https://vidcloud.eu.org');
-  forwardHeaders.set('user-agent', req.headers.get('user-agent') || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-  forwardHeaders.set('accept', req.headers.get('accept') || 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8');
-  forwardHeaders.set('accept-language', 'en-US,en;q=0.9');
-  
-  if (req.headers.get('cookie')) {
-    forwardHeaders.set('cookie', req.headers.get('cookie'));
-  }
+  forwardHeaders.delete('accept-encoding');
 
   try {
     const response = await fetch(targetUrl, {
       method: req.method,
       headers: forwardHeaders,
       body: req.method !== 'GET' && req.method !== 'HEAD' ? req.body : null,
-      redirect: 'follow',
     });
 
     const contentType = response.headers.get('content-type') || '';
@@ -164,15 +157,6 @@ export default async function handler(req) {
           z-index: 9999999 !important;
           backdrop-filter: blur(2px);
         }
-
-        .sr-overlay.sr-force-hide {
-          display: none !important;
-          visibility: hidden !important;
-          opacity: 0 !important;
-          pointer-events: none !important;
-          z-index: -9999 !important;
-        }
-
         #srPopup {
           background: #ffffff;
           width: 88%;
@@ -243,45 +227,17 @@ export default async function handler(req) {
       </style>
       <script>
         // Instant Close & Unfreeze Scrolling Function
-        function closeSrModal(e) {
-          if (e) {
-            e.preventDefault();
-            e.stopPropagation();
-          }
-
-          var overlays = document.querySelectorAll('#srOverlay, .sr-overlay');
-          overlays.forEach(function(el) {
-            el.classList.add('sr-force-hide');
+        function closeSrModal() {
+          var el = document.getElementById('srOverlay');
+          if (el) {
             el.style.setProperty('display', 'none', 'important');
-            if (el.parentNode) {
-              el.parentNode.removeChild(el);
-            }
-          });
-
-          document.body.classList.remove('modal-open', 'no-scroll', 'overflow-hidden');
-          document.documentElement.classList.remove('modal-open', 'no-scroll', 'overflow-hidden');
+            el.remove();
+          }
 
           document.body.style.setProperty('overflow', 'auto', 'important');
           document.body.style.setProperty('position', 'static', 'important');
-          document.body.style.setProperty('height', 'auto', 'important');
-
           document.documentElement.style.setProperty('overflow', 'auto', 'important');
-          document.documentElement.style.setProperty('position', 'static', 'important');
-          document.documentElement.style.setProperty('height', 'auto', 'important');
         }
-
-        // Capture phase listeners for reliable close
-        document.addEventListener('click', function(e) {
-          if (e.target && (e.target.id === 'srClose' || e.target.id === 'srBtn' || e.target.id === 'srOverlay')) {
-            closeSrModal(e);
-          }
-        }, true);
-
-        document.addEventListener('touchstart', function(e) {
-          if (e.target && (e.target.id === 'srClose' || e.target.id === 'srBtn')) {
-            closeSrModal(e);
-          }
-        }, { passive: false });
 
         // Client-side dynamic text replacement engine
         function replaceDOMText() {
@@ -290,7 +246,7 @@ export default async function handler(req) {
           while (node = walk.nextNode()) {
             if (node.nodeValue) {
               let updated = node.nodeValue;
-              updated = updated.replace(/Stark\\\\/PW Team/gi, 'AURA MAX');
+              updated = updated.replace(/Stark\\/PW Team/gi, 'AURA MAX');
               updated = updated.replace(/Study Stark/gi, 'AURA MAX');
               updated = updated.replace(/studystark/gi, 'AURA MAX');
               updated = updated.replace(/Dev Aryan/gi, '₋⁻–RATHOR');
@@ -342,7 +298,7 @@ export default async function handler(req) {
           tgBtn.className = 'custom-menu-tg-btn';
           tgBtn.href = 'https://t.me/+poV8mzcMG4dkY2Vl';
           tgBtn.target = '_blank';
-          tgBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-12zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.121l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.458c.538-.196 1.006.128.832.941z"/></svg> <span>Join Telegram</span>';
+          tgBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.121l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.458c.538-.196 1.006.128.832.941z"/></svg> <span>Join Telegram</span>';
           
           dropdownContent.appendChild(tgBtn);
 
@@ -379,6 +335,22 @@ export default async function handler(req) {
             var oldPopups = document.querySelectorAll('#join-tg-popup-container');
             oldPopups.forEach(function(item) { item.remove(); });
           }, 400);
+
+          var closeBtn = document.getElementById('srClose');
+          var overlay = document.getElementById('srOverlay');
+
+          if (closeBtn) {
+            closeBtn.addEventListener('click', closeSrModal);
+            closeBtn.addEventListener('touchstart', closeSrModal);
+          }
+
+          if (overlay) {
+            overlay.addEventListener('click', function(e) {
+              if (e.target === overlay) {
+                closeSrModal();
+              }
+            });
+          }
         });
 
         (function() {
@@ -404,15 +376,15 @@ export default async function handler(req) {
       </head>`;
 
       const newPopupHTML = `
-      <div id="srOverlay" class="sr-overlay" onclick="if(event.target === this) closeSrModal(event)">
+      <div id="srOverlay" class="sr-overlay">
         <div id="srPopup">
-          <button type="button" id="srClose" onclick="closeSrModal(event)">✕</button>
+          <div id="srClose" onclick="closeSrModal()" ontouchstart="closeSrModal()">✕</div>
           <div id="srIcon">📢</div>
           <div id="srTitle">Join Our Community</div>
           <div id="srSub">
             Stay updated with latest material<br>and notifications
           </div>
-          <a href="https://t.me/+poV8mzcMG4dkY2Vl" target="_blank" id="srBtn" onclick="closeSrModal(event)">
+          <a href="https://t.me/+poV8mzcMG4dkY2Vl" target="_blank" id="srBtn" onclick="closeSrModal()">
             Join Now
           </a>
         </div>
