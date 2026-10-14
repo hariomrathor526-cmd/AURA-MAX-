@@ -23,6 +23,36 @@ export default async function handler(req) {
     });
   }
 
+  // 1.5 Handle Proxying External Media / Bunny CDN Requests
+  if (url.pathname.startsWith('/__proxy_cdn/')) {
+    try {
+      const realUrl = decodeURIComponent(url.pathname.replace('/__proxy_cdn/', '')) + url.search;
+      const targetCdnUrl = new URL(realUrl);
+
+      const cdnHeaders = new Headers(req.headers);
+      cdnHeaders.set('host', targetCdnUrl.host);
+      cdnHeaders.set('referer', 'https://vidcloud.eu.org/');
+      cdnHeaders.set('origin', 'https://vidcloud.eu.org');
+      cdnHeaders.delete('accept-encoding');
+
+      const cdnResponse = await fetch(realUrl, {
+        method: req.method,
+        headers: cdnHeaders,
+      });
+
+      const responseHeaders = new Headers(cdnResponse.headers);
+      responseHeaders.set('access-control-allow-origin', '*');
+      responseHeaders.set('access-control-allow-methods', 'GET, POST, PUT, DELETE, OPTIONS');
+
+      return new Response(cdnResponse.body, {
+        status: cdnResponse.status,
+        headers: responseHeaders,
+      });
+    } catch (e) {
+      return new Response('CDN Proxy Error: ' + e.message, { status: 500 });
+    }
+  }
+
   // 2. Target Forwarding
   const targetUrl = targetDomain + url.pathname + url.search;
 
@@ -353,22 +383,31 @@ export default async function handler(req) {
           }
         });
 
+        // Intercept all network calls including CDN/Bunny Requests
         (function() {
           const myDomain = '${currentDomain}';
+
+          function proxyUrlIfNeeded(inputUrl) {
+            if (typeof inputUrl === 'string') {
+              if (inputUrl.includes('testwave.cc') || inputUrl.includes('bunny-cdn') || inputUrl.includes('.docx')) {
+                return myDomain + '/__proxy_cdn/' + encodeURIComponent(inputUrl);
+              }
+              if (inputUrl.includes('vidcloud.eu.org')) {
+                return inputUrl.replace('https://vidcloud.eu.org', myDomain);
+              }
+            }
+            return inputUrl;
+          }
           
           const originalFetch = window.fetch;
           window.fetch = function(...args) {
-            if (typeof args[0] === 'string' && args[0].includes('vidcloud.eu.org')) {
-              args[0] = args[0].replace('https://vidcloud.eu.org', myDomain);
-            }
+            args[0] = proxyUrlIfNeeded(args[0]);
             return originalFetch.apply(this, args);
           };
 
           const originalXHR = window.XMLHttpRequest.prototype.open;
           window.XMLHttpRequest.prototype.open = function(method, url, ...rest) {
-            if (typeof url === 'string' && url.includes('vidcloud.eu.org')) {
-              url = url.replace('https://vidcloud.eu.org', myDomain);
-            }
+            url = proxyUrlIfNeeded(url);
             return originalXHR.call(this, method, url, ...rest);
           };
         })();
