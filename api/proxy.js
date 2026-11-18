@@ -40,9 +40,33 @@ export default async function handler(req) {
         headers: cdnHeaders,
       });
 
+      const contentType = cdnResponse.headers.get('content-type') || '';
       const responseHeaders = new Headers(cdnResponse.headers);
       responseHeaders.set('access-control-allow-origin', '*');
       responseHeaders.set('access-control-allow-methods', 'GET, POST, PUT, DELETE, OPTIONS');
+
+      // Rewrite .m3u8 playlist relative chunks so they go through proxy
+      if (realUrl.includes('.m3u8') || contentType.includes('text') || contentType.includes('application')) {
+        let text = await cdnResponse.text();
+        if (text.includes('#EXTM3U')) {
+          const cdnBase = `${targetCdnUrl.protocol}//${targetCdnUrl.host}`;
+          text = text.split('\n').map(line => {
+            let trimmed = line.trim();
+            if (trimmed && !trimmed.startsWith('#')) {
+              if (!trimmed.startsWith('http')) {
+                const absoluteChunkUrl = cdnBase + '/' + trimmed;
+                return currentDomain + '/__proxy_cdn/' + encodeURIComponent(absoluteChunkUrl);
+              }
+            }
+            return line;
+          }).join('\n');
+        }
+
+        return new Response(text, {
+          status: cdnResponse.status,
+          headers: responseHeaders,
+        });
+      }
 
       return new Response(cdnResponse.body, {
         status: cdnResponse.status,
