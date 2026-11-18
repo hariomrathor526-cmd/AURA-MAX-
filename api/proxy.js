@@ -26,7 +26,16 @@ export default async function handler(req) {
   // 1.5 Handle Proxying External Media / Bunny CDN Requests
   if (url.pathname.startsWith('/__proxy_cdn/')) {
     try {
-      const realUrl = decodeURIComponent(url.pathname.replace('/__proxy_cdn/', '')) + url.search;
+      const rawPath = decodeURIComponent(url.pathname.replace('/__proxy_cdn/', ''));
+      
+      let realUrl;
+      if (rawPath.startsWith('http://') || rawPath.startsWith('https://')) {
+        realUrl = rawPath + url.search;
+      } else {
+        const baseCdn = 'https://bunny-cdn-qbg-s7.testwave.cc';
+        realUrl = baseCdn + (rawPath.startsWith('/') ? '' : '/') + rawPath + url.search;
+      }
+
       const targetCdnUrl = new URL(realUrl);
 
       const cdnHeaders = new Headers(req.headers);
@@ -40,33 +49,9 @@ export default async function handler(req) {
         headers: cdnHeaders,
       });
 
-      const contentType = cdnResponse.headers.get('content-type') || '';
       const responseHeaders = new Headers(cdnResponse.headers);
       responseHeaders.set('access-control-allow-origin', '*');
       responseHeaders.set('access-control-allow-methods', 'GET, POST, PUT, DELETE, OPTIONS');
-
-      // Rewrite .m3u8 playlist relative chunks so they go through proxy
-      if (realUrl.includes('.m3u8') || contentType.includes('text') || contentType.includes('application')) {
-        let text = await cdnResponse.text();
-        if (text.includes('#EXTM3U')) {
-          const cdnBase = `${targetCdnUrl.protocol}//${targetCdnUrl.host}`;
-          text = text.split('\n').map(line => {
-            let trimmed = line.trim();
-            if (trimmed && !trimmed.startsWith('#')) {
-              if (!trimmed.startsWith('http')) {
-                const absoluteChunkUrl = cdnBase + '/' + trimmed;
-                return currentDomain + '/__proxy_cdn/' + encodeURIComponent(absoluteChunkUrl);
-              }
-            }
-            return line;
-          }).join('\n');
-        }
-
-        return new Response(text, {
-          status: cdnResponse.status,
-          headers: responseHeaders,
-        });
-      }
 
       return new Response(cdnResponse.body, {
         status: cdnResponse.status,
@@ -280,7 +265,6 @@ export default async function handler(req) {
         }
       </style>
       <script>
-        // Instant Close & Unfreeze Scrolling Function
         function closeSrModal() {
           var el = document.getElementById('srOverlay');
           if (el) {
@@ -293,14 +277,13 @@ export default async function handler(req) {
           document.documentElement.style.setProperty('overflow', 'auto', 'important');
         }
 
-        // Client-side dynamic text replacement engine
         function replaceDOMText() {
           const walk = document.createTreeWalker(document.body || document.documentElement, NodeFilter.SHOW_TEXT, null, false);
           let node;
           while (node = walk.nextNode()) {
             if (node.nodeValue) {
               let updated = node.nodeValue;
-              updated = updated.replace(/Stark\\/PW Team/gi, 'AURA MAX');
+              updated = updated.replace(/Stark\/PW Team/gi, 'AURA MAX');
               updated = updated.replace(/Study Stark/gi, 'AURA MAX');
               updated = updated.replace(/studystark/gi, 'AURA MAX');
               updated = updated.replace(/Dev Aryan/gi, '₋⁻–RATHOR');
@@ -311,7 +294,6 @@ export default async function handler(req) {
           }
         }
 
-        // Client-side logo image replacement engine
         function replaceImages() {
           const newUrl = "${newLogo}";
           document.querySelectorAll('img').forEach(function(img) {
@@ -321,7 +303,6 @@ export default async function handler(req) {
           });
         }
 
-        // Group Header Control items inside styled Dropdown Menu
         function organizeHeaderControls() {
           const controls = document.querySelector('.header-controls');
           if (!controls || controls.dataset.menuConverted === "true") return;
@@ -347,7 +328,6 @@ export default async function handler(req) {
             dropdownContent.appendChild(btn);
           });
 
-          // Add Telegram Link
           const tgBtn = document.createElement('a');
           tgBtn.className = 'custom-menu-tg-btn';
           tgBtn.href = 'https://t.me/+poV8mzcMG4dkY2Vl';
@@ -360,7 +340,6 @@ export default async function handler(req) {
           menuWrapper.appendChild(dropdownContent);
           controls.appendChild(menuWrapper);
 
-          // Toggle
           menuBtn.addEventListener('click', function(e) {
             e.stopPropagation();
             dropdownContent.classList.toggle('show');
@@ -407,7 +386,6 @@ export default async function handler(req) {
           }
         });
 
-        // Intercept all network calls including CDN/Bunny Requests
         (function() {
           const myDomain = '${currentDomain}';
 
@@ -457,15 +435,11 @@ export default async function handler(req) {
       html = html.replace('</head>', injectedAssets);
       html = html.replace('</body>', newPopupHTML);
 
-      // Logo Replacements
       html = html.replaceAll(oldLogo, newLogo);
       html = html.replaceAll('/images/logo.png', newLogo);
-
-      // Rebranding
       html = html.replaceAll('https://vidcloud.eu.org', currentDomain);
       html = html.replaceAll('vidcloud.eu.org', url.host);
 
-      // Text Replacements
       html = html.replaceAll('Stark/PW Team', 'AURA MAX');
       html = html.replace(/studystark/gi, 'AURA MAX');
       html = html.replaceAll('Study Stark', 'AURA MAX');
@@ -481,7 +455,6 @@ export default async function handler(req) {
       });
     }
 
-    // 4. JS & JSON Handlers
     if (contentType.includes('javascript') || contentType.includes('json')) {
       let text = await response.text();
       
@@ -503,7 +476,6 @@ export default async function handler(req) {
       });
     }
 
-    // 5. Media & Streams
     const modifiedHeaders = new Headers(response.headers);
     modifiedHeaders.set('access-control-allow-origin', '*');
     modifiedHeaders.set('access-control-allow-methods', 'GET, POST, PUT, DELETE, OPTIONS');
